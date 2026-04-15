@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/scripts/completion-check.js",
+        "description": "角色/会话结束前确认 context doc 门禁状态与协调员 todo-list 续跑条件；exit 2 = 阻止结束并要求继续或补全"
+      }
+    ],
+    "SubagentStop": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/scripts/completion-check.js",
+        "description": "子代理结束前确认 context doc 门禁状态与协调员 todo-list 续跑条件；exit 2 = 阻止并提示补全"
+      }
+    ]
+  }
+}

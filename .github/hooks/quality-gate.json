@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/scripts/quality-check.js",
+        "description": "校验写操作后的文件格式与结构；exit 2 = 要求角色修正后重写"
+      }
+    ]
+  }
+}

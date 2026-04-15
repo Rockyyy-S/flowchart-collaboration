@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "node .github/hooks/scripts/security-check.js",
+        "description": "拦截高危写操作（rm -rf、DROP TABLE、生产破坏命令）；exit 2 = 拦截"
+      }
+    ]
+  }
+}

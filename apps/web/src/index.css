@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局布局 */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* 流程画布节点卡片连接箭头 */
+.flow-arrow {
+  display: flex;
+  align-items: center;
+  color: #d9d9d9;
+  font-size: 20px;
+  flex-shrink: 0;
+  padding: 0 4px;
+}
+
+/* 节点卡片状态对应边框颜色 */
+.node-card-PENDING {
+  border-color: #d9d9d9 !important;
+  opacity: 0.6;
+}
+.node-card-READY {
+  border-color: #1677ff !important;
+}
+.node-card-IN_PROGRESS {
+  border-color: #fa8c16 !important;
+}
+.node-card-GATE_CHECKING {
+  border-color: #722ed1 !important;
+}
+.node-card-COMPLETED {
+  border-color: #52c41a !important;
+}
+.node-card-NEEDS_FIX {
+  border-color: #ff4d4f !important;
+  animation: pulse-red 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(255, 77, 79, 0.1); }
+}
+
+/* 流程画布横向滚动 */
+.flow-canvas-scroll {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
