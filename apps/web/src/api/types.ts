@@ -48,6 +48,8 @@ export interface NodeConfig {
 export interface GraphNode {
   id: string;
   text: string;
+  x?: number;
+  y?: number;
 }
 
 /** 流程图边定义（graphJson 中） */
@@ -154,6 +156,7 @@ export interface UpdateFlowDraftDto {
       id: string;
       name: string;
       required: boolean;
+      sourceType?: 'DOCUMENT' | 'ANY';
     }>;
     predecessorNodeIds?: string[];
   }>;

@@ -11,14 +11,43 @@ body,
   padding: 0;
 }
 
-/* 流程画布节点卡片连接箭头 */
-.flow-arrow {
-  display: flex;
-  align-items: center;
-  color: #d9d9d9;
-  font-size: 20px;
-  flex-shrink: 0;
-  padding: 0 4px;
+/* 真实流程画布 */
+.real-flow-canvas {
+  position: relative;
+  width: 100%;
+  min-height: 420px;
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  background-image:
+    linear-gradient(to right, #fafafa 1px, transparent 1px),
+    linear-gradient(to bottom, #fafafa 1px, transparent 1px);
+  background-size: 24px 24px;
+  overflow: auto;
+}
+
+.real-flow-canvas__edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.real-flow-canvas__nodes {
+  position: relative;
+  width: 100%;
+  min-height: 420px;
+}
+
+.real-flow-node {
+  position: absolute;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border-width: 2px;
+  border-style: solid;
+  background: #ffffff;
+  user-select: none;
+  transition: box-shadow 0.2s ease;
 }
 
 /* 节点卡片状态对应边框颜色 */
@@ -46,10 +75,4 @@ body,
 @keyframes pulse-red {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.3); }
   50% { box-shadow: 0 0 0 4px rgba(255, 77, 79, 0.1); }
-}
-
-/* 流程画布横向滚动 */
-.flow-canvas-scroll {
-  overflow-x: auto;
-  padding-bottom: 8px;
 }

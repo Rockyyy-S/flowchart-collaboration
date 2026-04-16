@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   Col,
+  Segmented,
   Result,
   Row,
   Skeleton,
@@ -13,6 +14,7 @@ import {
   Statistic,
   Tag,
   Typography,
+  message,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -22,12 +24,12 @@ import {
   ReloadOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getExecutions } from '../api/executions';
-import { getCurrentFlow } from '../api/flows';
+import { getCurrentFlow, updateFlowDraft } from '../api/flows';
 import FlowCanvas from '../components/FlowCanvas';
 import NodeDetailDrawer from '../components/NodeDetailDrawer';
-import type { NodeExecution } from '../api/types';
+import type { NodeExecution, UpdateFlowDraftDto } from '../api/types';
 
 const { Title, Text } = Typography;
 
@@ -45,6 +47,7 @@ export default function ProjectPage() {
   const [selectedExecution, setSelectedExecution] =
     useState<NodeExecution | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [canvasMode, setCanvasMode] = useState<'view' | 'edit'>('view');
 
   // 拉取流程定义
   const {
@@ -80,10 +83,28 @@ export default function ProjectPage() {
     queryClient.invalidateQueries({ queryKey: ['flow', projectId] });
   }
 
+  const saveDraftMut = useMutation({
+    mutationFn: (dto: UpdateFlowDraftDto) => updateFlowDraft(projectId!, dto),
+    onSuccess: () => {
+      message.success('流程草稿已保存');
+      queryClient.invalidateQueries({ queryKey: ['flow', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['executions', projectId] });
+    },
+  });
+
   /** 打开节点抽屉 */
   function handleNodeClick(execution: NodeExecution) {
     setSelectedExecution(execution);
     setDrawerOpen(true);
+  }
+
+  function handleModeChange(value: string | number) {
+    const mode = value === 'edit' ? 'edit' : 'view';
+    setCanvasMode(mode);
+    if (mode === 'edit') {
+      setDrawerOpen(false);
+      setSelectedExecution(null);
+    }
   }
 
   useEffect(() => {
@@ -277,9 +298,20 @@ export default function ProjectPage() {
         title="流程画布"
         style={{ borderRadius: 10, marginBottom: 16 }}
         extra={
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            点击节点卡片进入操作
-          </Text>
+          <Space size={10}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {canvasMode === 'view' ? '执行态：点击节点进入操作' : '编辑态：拖拽/连线/保存'}
+            </Text>
+            <Segmented
+              size="small"
+              value={canvasMode}
+              options={[
+                { label: '执行模式', value: 'view' },
+                { label: '编辑模式', value: 'edit' },
+              ]}
+              onChange={handleModeChange}
+            />
+          </Space>
         }
       >
         {flowLoading || execLoading ? (
@@ -289,6 +321,9 @@ export default function ProjectPage() {
             flowDefinition={flowDefinition}
             executions={executions}
             selectedExecutionId={selectedExecution?.executionId}
+            mode={canvasMode}
+            saving={saveDraftMut.isPending}
+            onSaveDraft={(dto) => saveDraftMut.mutate(dto)}
             onNodeClick={handleNodeClick}
           />
         ) : (

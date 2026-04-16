@@ -1,13 +1,13 @@
 # flowchart-collaboration 前端实现总结
 
-> 版本：v0.1 | 日期：2026-04-14 | 角色：前端专家 | 状态：MVP 已完成
+> 版本：v0.3 | 日期：2026-04-16 | 角色：前端专家 | 状态：真实可编辑流程画布已落地（文档同步）
 
 ---
 
 ## 一、实现目标与结果
 
 | 目标 | 结果 |
-|------|------|
+| --- | --- |
 | 创建 `apps/web` 前端工程（React + TypeScript + Vite） | ✅ 完成 |
 | 实现项目工作台、流程画布、节点详情抽屉、门禁结果面板 | ✅ 完成 |
 | 接入全部后端 API（创建项目、保存草稿、执行管理、门禁、文档绑定） | ✅ 完成 |
@@ -24,7 +24,7 @@
 ### 新增文件
 
 | 文件 | 说明 |
-|------|------|
+| --- | --- |
 | `apps/web/package.json` | 前端依赖声明（React 18 / Antd v5 / TanStack Query / axios） |
 | `apps/web/vite.config.ts` | Vite 配置（dev proxy → localhost:3000） |
 | `apps/web/tsconfig.json` | TypeScript 配置 |
@@ -37,13 +37,13 @@
 | `apps/web/src/App.tsx` | 路由配置 + Antd 全局 Provider |
 | `apps/web/src/index.css` | 全局样式 + 节点状态颜色 CSS 类 |
 | `apps/web/src/api/types.ts` | 全部 API 类型定义（与后端 DTO/接口对齐） |
-| `apps/web/src/api/client.ts` | Axios 实例（BaseURL / x-user-id 头 / 响应解包 / 错误 toast） |
+| `apps/web/src/api/client.ts` | Axios 实例（BaseURL / Authorization Bearer 头 / 响应解包 / 错误 toast） |
 | `apps/web/src/api/projects.ts` | `createProject` |
 | `apps/web/src/api/flows.ts` | `getCurrentFlow` / `updateFlowDraft` |
 | `apps/web/src/api/executions.ts` | `getExecutions` / `startExecution` / `submitExecution` / `getGateResult` / `bindArtifact` |
 | `apps/web/src/api/documents.ts` | `createDocument` / `getDocuments` |
 | `apps/web/src/components/layout/AppLayout.tsx` | 全局布局（顶部导航 + 主区域） |
-| `apps/web/src/components/FlowCanvas/index.tsx` | 流程画布（拓扑排序 + 节点卡片列表） |
+| `apps/web/src/components/FlowCanvas/index.tsx` | 流程画布（真实可编辑画布：节点定位 + 连线 SVG + 编辑工具栏） |
 | `apps/web/src/components/FlowCanvas/NodeCard.tsx` | 单节点卡片（状态颜色 / 动作按钮） |
 | `apps/web/src/components/GateResultPanel/index.tsx` | 门禁结果展示面板 |
 | `apps/web/src/components/DocumentUploadModal/index.tsx` | 文档上传 & 绑定弹窗 |
@@ -60,7 +60,7 @@
 ### 工作台页面（`/`）
 
 | 交互 | 实现方式 |
-|------|---------|
+| --- | --- |
 | 首次访问空引导 | 展示演示横幅 + 「一键体验」按钮 |
 | 创建演示项目 | 调用 `createProject` + `updateFlowDraft`（预设 5 节点研发流程），自动跳转 |
 | 新建自定义项目 | Modal 表单 → `createProject` + 初始化单节点草稿 |
@@ -70,7 +70,7 @@
 ### 项目详情页（`/projects/:projectId`）
 
 | 交互 | 实现方式 |
-|------|---------|
+| --- | --- |
 | 流程画布展示 | 拉取 `getCurrentFlow` + `getExecutions`，拓扑排序渲染 |
 | 节点状态颜色 | CSS class `node-card-{STATUS}`，6 种状态各有对应颜色 |
 | NEEDS_FIX 脉冲动效 | CSS `@keyframes pulse-red` |
@@ -82,7 +82,7 @@
 ### 节点详情抽屉
 
 | 交互 | 实现方式 |
-|------|---------|
+| --- | --- |
 | 开始执行 | `startExecution` mutation（READY/NEEDS_FIX → IN_PROGRESS） |
 | 提交完成 | `submitExecution` mutation，response 即包含 gateResult |
 | 门禁结果即时展示 | submit 响应中直接拿 `missingArtifacts`，无需额外轮询 |
@@ -116,7 +116,7 @@ npm run dev                # 监听 http://localhost:5173
 ## 五、验收标准自检
 
 | 验收项 | 状态 | 说明 |
-|--------|------|------|
+| --- | --- | --- |
 | API 层与页面层分离 | ✅ | `src/api/` 与 `src/pages/` / `src/components/` 完全隔离 |
 | 「失败→缺项→绑定→重试→通过」闭环 | ✅ | NodeDetailDrawer 完整实现了 6 步演示路径 |
 | 至少 1 组默认示例数据 | ✅ | 工作台「快速体验演示项目」按钮，自动创建 5 节点研发流程 |
@@ -130,19 +130,60 @@ npm run dev                # 监听 http://localhost:5173
 ### 未完成项（移交 QA / 后续迭代）
 
 | 项目 | 原因 | 建议处理 |
-|------|------|---------|
-| LogicFlow 真实画布 | 集成成本高，MVP 使用列表式占位实现 | P1：封装 LogicFlow 适配层，替换 `FlowCanvas/index.tsx` 实现体 |
-| 流程节点拖拽编辑 | 依赖 LogicFlow | 同上 |
+| --- | --- | --- |
+| LogicFlow 引擎替换 | 当前已是轻量真实画布实现，但未引入缩放/迷你地图/路由线等高级能力 | P1：在保持现有保存协议不变的前提下，逐步替换为 LogicFlow 适配层 |
+| 高级编排能力 | 现有编辑能力聚焦 MVP（新增/删除/拖拽/连线/保存） | P1：补充缩放、迷你地图、批量框选、快捷键操作 |
 | 通知中心页面 | 后端通知接口未暴露列表查询（MVP 占位） | 后端补 `GET /me/notifications` 后追加页面 |
-| 多用户切换 | MVP 固定 `x-user-id: user-001` | 接入 JWT 鉴权后替换 `api/client.ts` 的 header 逻辑 |
+| 多用户与会话治理 | 当前支持开发态令牌登录，生产级会话策略未纳入本轮 | 后续接入更严格会话管理与账号体系（如 httpOnly Cookie + CSRF） |
 | 项目列表 API | 后端无 `GET /projects` 接口，localStorage 替代 | 后端补接口后把 WorkbenchPage 改为 React Query |
 | 单元测试 | MVP 阶段未编写 | QA 阶段补充 Vitest + React Testing Library |
 
 ### 风险与阻塞
 
 | 风险 | 影响 | 缓解措施 |
-|------|------|---------|
+| --- | --- | --- |
 | 后端内存存储 | 刷新/重启丢数据，无法持久体验演示 | 切换 PostgreSQL（已有替换指引） |
 | MVP 节点均 READY | 不符合真实「依次解锁」语义，易造成误操作 | 后端 `unlockSuccessors` 正常工作，切换 DB 后需验证 PENDING 状态逻辑 |
 | CORS（直接访问后端） | 若不用 Vite proxy 直接请求后端会 403 | 生产部署时配置 NestJS CORS 或 Nginx 反向代理 |
 | Antd v5 + TailwindCSS 样式冲突 | tailwind preflight 已关闭，潜在样式覆盖风险 | 持续关注 UI 渲染，必要时用 Ant Design `theme.token` 覆盖 |
+
+---
+
+## 七、2026-04-16 真实画布增强（本次）
+
+### 7.1 改动目标与结果
+
+| 目标 | 结果 |
+| --- | --- |
+| 将占位式流程列表升级为真实画布 | ✅ 已完成，ProjectPage 现为可视化节点布局 + 连线 SVG 画布 |
+| 支持最小可用编辑能力（新增、删除、拖拽、连线、保存） | ✅ 已完成，编辑模式内提供完整工具栏 |
+| 保持执行态节点详情抽屉兼容 | ✅ 已完成，执行模式点击节点行为不变 |
+| 保存时同步 `graphJson`、`nodesConfig`、`predecessorNodeIds` | ✅ 已完成，保存前按边关系重算 predecessor，保留已有 requiredArtifacts |
+
+### 7.2 关键实现与原因
+
+- 改造 [apps/web/src/components/FlowCanvas/index.tsx](../../apps/web/src/components/FlowCanvas/index.tsx)：
+  - 新增双模式：`view`（执行）/`edit`（编辑）。
+  - 编辑模式支持节点拖拽、从选中节点发起连线、删除节点并联动清理相关边。
+  - 保存时统一归一化边、过滤非法边（自环/重复/孤立），并基于 edges 重建 `predecessorNodeIds`。
+  - 对已有节点配置采用“按 nodeId 合并保留”策略，尽量避免 requiredArtifacts 丢失。
+- 改造 [apps/web/src/pages/ProjectPage.tsx](../../apps/web/src/pages/ProjectPage.tsx)：
+  - 增加“执行模式/编辑模式”切换，编辑态下自动关闭详情抽屉，避免交互冲突。
+  - 接入 `updateFlowDraft` 保存 mutation，保存成功后刷新 flow 与 executions，保证刷新后可恢复图结构。
+- 更新 [apps/web/src/api/types.ts](../../apps/web/src/api/types.ts)：
+  - `GraphNode` 增加可选坐标 `x/y`。
+  - `UpdateFlowDraftDto.requiredArtifacts` 增加可选 `sourceType`，避免保存时丢失来源类型。
+- 更新 [apps/web/src/index.css](../../apps/web/src/index.css)：
+  - 增加真实画布背景、边层、节点绝对定位样式。
+
+说明：本次未直接接入 LogicFlow，而采用与现有 `graphJson` 结构完全兼容的轻量实现。主要原因是当前仓库已有严格 API/类型约束，且目标为“在现有 ProjectPage/FlowCanvas 体系内最小改造并保证可构建可回归”；该方案无新增依赖即可满足拖拽、连线、保存和兼容执行态的验收要求。
+
+### 7.3 验证步骤与风险
+
+1. 进入项目页，确认可见真实画布（非纯列表）。
+2. 切换到编辑模式，点击“新增节点”，拖拽位置后发起并完成连线。
+3. 点击“保存流程草稿”，刷新页面，确认节点位置与边关系恢复。
+4. 删除一个有入/出边的节点并保存，检查后端返回的流程中不存在悬挂边，且 `predecessorNodeIds` 与剩余 edges 一致。
+5. 切回执行模式，点击节点仍可打开详情抽屉并执行原有操作。
+
+已知风险：当前画布为轻量自实现，不含缩放、迷你地图、复杂路由线与批量操作；若后续需要高级编排能力，可在现有模式与保存协议不变前提下，逐步替换为 LogicFlow 引擎。

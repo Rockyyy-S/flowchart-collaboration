@@ -1,6 +1,6 @@
 # flowchart-collaboration Context Doc
 
-> 版本：v1.9 | 日期：2026-04-16 | 负责角色：文档撰写员 | 状态：安全门禁已通过（v0.5），QA 仍阻塞（唯一阻塞：运行时联调证据缺失）
+> 版本：v2.2 | 日期：2026-04-16 | 负责角色：文档撰写员 | 状态：已同步前端“真实流程画布”相关用户文档与实现总结；阶段门禁结论保持不变
 
 ## 元信息
 
@@ -31,11 +31,11 @@
 |---|---|---|---|---|
 | 需求澄清 | ✅完成 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) | 2026-04-13 | PRD v1.0 已形成需求基线。 |
 | 架构边界 | ✅完成 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) | 2026-04-14 | v0.1 MVP 架构边界已冻结，可支持前后端并行开发。 |
-| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-15 | 完成后端安全改造前端配套联调：Bearer token 鉴权链路、开发态令牌获取、上传契约对齐与关键体验修复。 |
+| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-16 | 已完成真实可编辑流程画布改造：支持新增/删除节点、拖拽、连线、保存草稿，并保持执行态节点抽屉兼容。 |
 | 后端实现 | ✅完成 | [flowchart-collaboration-backend-summary](../implementation/flowchart-collaboration-backend-summary.md) | 2026-04-15 | 已补齐当前架构下可落地的中危整改：OWNER 审计查询、基础内存限流、submit 原子提交/失败回滚；JWT、项目级访问控制、上传安全与 DTO 校验继续保持。 |
-| QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) | 2026-04-15 | 已完成最小 QA 复判：QA-20260415-01/02 均已修复，但运行时联调证据仍未补齐，QA 门禁❌。 |
+| QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) | 2026-04-16 | 已完成前端流程图编辑器专项回归：本次改动未发现新增阻塞级缺陷；但运行时联调证据仍未补齐，QA 门禁❌。 |
 | 安全审查 | ✅完成 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) | 2026-04-16 | 第三轮复审完成：VUL-10/11/12/13 全部关闭，安全门禁通过（v0.5）。 |
-| 文档沉淀 | ✅完成 | [flowchart-collaboration-context](flowchart-collaboration-context.md)、[quick-reference-guide](../quick-reference-guide.md)、[flowchart-collaboration-user-guide](../user-docs/flowchart-collaboration-user-guide.md)、[flowchart-collaboration-maintenance-runbook](../ops/flowchart-collaboration-maintenance-runbook.md) | 2026-04-14 | MVP 文档沉淀完成：用户操作指南 + 维护运维手册已落地。 |
+| 文档沉淀 | ✅完成 | [flowchart-collaboration-context](flowchart-collaboration-context.md)、[quick-reference-guide](../quick-reference-guide.md)、[flowchart-collaboration-user-guide](../user-docs/flowchart-collaboration-user-guide.md)、[flowchart-collaboration-maintenance-runbook](../ops/flowchart-collaboration-maintenance-runbook.md) | 2026-04-14 | MVP 文档沉淀完成：用户操作指南 + 维护运维手册已落地；2026-04-16 已同步真实流程画布与编辑模式说明。 |
 | 发布准备 | ❌阻塞 | [v0.1.0-release-note](../releases/v0.1.0-release-note.md) | 2026-04-15 | 已形成上线/回滚清单与灰度演练记录；安全门禁已通过（v0.5），当前仅阻塞项为 QA 运行时联调证据缺失。 |
 
 ## 质量门禁状态
@@ -44,7 +44,7 @@
 |---|---|---|---|
 | 需求门禁 | ✅通过 | PRD v1.0 已完成评审状态标记，可作为后续阶段输入。 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) |
 | 架构门禁 | ✅通过 | 已完成 v0.1 架构边界文档，覆盖分层、契约、约束与里程碑。 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) |
-| QA 门禁 | ❌未通过 | 本轮最小 QA 复判确认：QA-20260415-01 与 QA-20260415-02 均已修复；但本轮仍仅完成代码审查与静态检查，401/403、429 与关键交互缺运行时联调证据，暂不满足放行条件。 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) |
+| QA 门禁 | ❌未通过 | 本轮前端流程图编辑器回归确认：可视化画布、编辑能力、保存一致性、执行态抽屉兼容与前端类型检查均通过，未发现本次变更新增阻塞级缺陷；项目整体仍缺运行时联调证据，暂不满足放行条件。 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) |
 | 安全门禁 | ✅通过 | 三轮复审完成：VUL-01~13 全部关闭或降级，安全门禁通过。 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) |
 | 发布门禁 | ❌未通过 | QA 仍阻塞（仅缺运行时联调证据），发布申请暂缓。 | [v0.1.0-release-note](../releases/v0.1.0-release-note.md) |
 
@@ -56,7 +56,7 @@
 | 2026-04-14 | 发布准备 | 安全策略与审查深度尚未明确，可能影响上线窗口。 | 按 MVP 范围确认安全审查清单并预排审查时间。 | 未解除 |
 | 2026-04-14 | 后端实现 | JWT 鉴权、RBAC Guard、限流（ThrottlerModule）尚未实现，属安全基线 P0 待补项。 | 安全审查阶段补充，交接给安全审查师。 | 已解除 |
 | 2026-04-14 | 后端实现 | submit() 状态变更与事件发布尚非 DB 事务，正式版本需引入 TypeORM QueryRunner + outbox 模式。 | 切换 PostgreSQL 时同步处理。 | 未解除 |
-| 2026-04-14 | 前端实现 | 流程画布为列表式占位实现，尚未集成 LogicFlow（拖拽编辑、真实有向图渲染）。 | P1 迭代接入 LogicFlow，接口已封装为适配层，替换时无需修改上层页面。 | 未解除 |
+| 2026-04-14 | 前端实现 | 流程画布为列表式占位实现，尚未集成 LogicFlow（拖拽编辑、真实有向图渲染）。 | 2026-04-16 已完成前端真实可编辑画布改造（等效能力）：新增/删除节点、拖拽、连线、保存草稿。 | 已解除 |
 | 2026-04-14 | 前端实现 | 后端无 GET /projects 列表接口，项目列表依赖 localStorage（跨浏览器/清缓存后丢失）。 | 后端补 GET /projects 端点后修改 WorkbenchPage。 | 未解除 |
 | 2026-04-14 | 前端实现 | MVP 所有节点初始为 READY 状态（后端简化），不符合真实依次解锁语义。 | 切换 PostgreSQL 后验证 predecessorNodeIds + unlockSuccessors 逻辑。 | 未解除 |
 | 2026-04-15 | 安全审查 | 开发态 JWT 当前保存在 localStorage，若进入生产需改为更安全会话方案（如 httpOnly Cookie + CSRF 防护）。 | sessionStorage 迁移完成，满足 MVP 放行条件。 | 已解除 |
@@ -81,6 +81,7 @@
 - 完成 Bearer token 鉴权链路切换：前端 API 客户端移除 `x-user-id`，统一按 `Authorization: Bearer <token>` 注入；写接口未登录时前置拦截并给出令牌获取引导。
 - 新增最小登录流程：导航栏增加开发态令牌入口，支持输入 `userId` 调用 `POST /api/v1/auth/token` 获取 JWT，并支持更换/清除本地令牌。
 - 上传契约对齐后端：继续仅提交 `name/mimeType/size`，不再存在 `storageKey` 客户端输入；上传/绑定失败补充可读原因提示并支持重试。
+- 完成真实流程图编辑器改造（FlowCanvas）：提供“执行模式/编辑模式”隔离，编辑模式支持新增节点、删除节点、拖拽移动、发起连线与保存流程草稿；保存时同步 `graphJson`、`nodesConfig` 与 `predecessorNodeIds`，并尽量保留既有节点配置。
 - 修复关键 bug/体验问题（>=2）：
 	- 修复工作台重复触发创建导致并发提交问题（按钮与弹窗确认态联动禁用）。
 	- 修复项目页节点选中状态与数据刷新不同步问题（执行列表刷新后自动校正/关闭无效抽屉）。
@@ -122,3 +123,6 @@
 | 2026-04-15 | v1.7 | QA 专家 | 对本轮最新代码执行最小复判（仅代码审查+静态检查）：QA-20260415-01 与 QA-20260415-02 均已修复；运行时联调证据仍缺失，QA 门禁维持❌。 | 回传项目总协调，待补齐运行时联调证据后再复判 |
 | 2026-04-15 | v1.8 | 文档撰写员 | 同步发布准备口径：更新发布准备阶段备注为“QA 仅剩运行时联调证据缺失，安全阻塞为 VUL-13 + VUL-10/11/12 发布前确认项”。 | 回传项目总协调，用于发布文档与待办清单一致性维护 |
 | 2026-04-16 | v1.9 | 文档撰写员 | 同步第三轮安全复审与 QA 结论：安全门禁更新为✅通过（v0.5），发布门禁保留❌（仅阻塞运行时联调证据）；并更新阻塞记录口径。 | 回传项目总协调，用于发布申请重评估前的状态对齐 |
+| 2026-04-16 | v2.0 | 前端专家 | 完成前端真实可编辑流程画布改造：ProjectPage 新增执行/编辑双模式，支持新增/删除节点、拖拽、连线与保存草稿；回写前端阶段状态、实现摘要与风险解除记录。 | 交接 to_qa / to_security / to_docs |
+| 2026-04-16 | v2.1 | QA 专家 | 完成前端流程图编辑器专项回归：覆盖可视化画布、编辑能力、保存一致性、执行态抽屉兼容、前端类型检查；确认本次改动无新增阻塞级缺陷，项目整体阻塞项仍为历史遗留“运行时联调证据缺失”。 | 回传项目总协调，待补齐运行时联调证据后复核 QA 门禁 |
+| 2026-04-16 | v2.2 | 文档撰写员 | 同步前端“流程图编辑器已实现”文档：更新用户指南中的流程画布与编辑模式操作、修订已知限制为轻量真实画布口径，并修复前端实现总结新增节 Markdown 规范问题（表格分隔行空格、硬 tab/列表缩进）。 | 回传项目总协调，用于文档与当前代码一致性维护 |
