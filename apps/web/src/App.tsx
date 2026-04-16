@@ -2,11 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, App as AntApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import AppLayout from './components/layout/AppLayout';
-import WorkbenchPage from './pages/WorkbenchPage';
-import ProjectPage from './pages/ProjectPage';
+import MainWorkspace from './pages/MainWorkspace';
 
 /**
  * 根组件：路由配置 + Ant Design 全局配置（中文语言包）
+ * 主页面采用三栏布局，项目切换通过左侧面板完成，无需页面跳转。
  */
 export default function App() {
   return (
@@ -15,8 +15,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route element={<AppLayout />}>
-              <Route index element={<WorkbenchPage />} />
-              <Route path="/projects/:projectId" element={<ProjectPage />} />
+              <Route index element={<MainWorkspace />} />
             </Route>
             {/* 兜底：未命中路由跳回首页 */}
             <Route path="*" element={<Navigate to="/" replace />} />

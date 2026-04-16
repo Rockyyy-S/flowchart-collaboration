@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link } from 'react-router-dom';
 import {
   Button,
   Form,
@@ -28,8 +28,6 @@ const { Header, Content } = Layout;
  * - 主内容区域（响应式内边距）
  */
 export default function AppLayout() {
-  const location = useLocation();
-  const isHome = location.pathname === '/';
   const [tokenSnapshot, setSnapshot] = useState(getTokenSnapshot);
   const [loginOpen, setLoginOpen] = useState(false);
   const [issuingToken, setIssuingToken] = useState(false);
@@ -58,7 +56,7 @@ export default function AppLayout() {
   }
 
   return (
-    <Layout className="min-h-screen" style={{ background: '#f5f6fa' }}>
+    <Layout style={{ background: '#f5f6fa', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 顶部导航 */}
       <Header
         style={{
@@ -68,8 +66,7 @@ export default function AppLayout() {
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          position: 'sticky',
-          top: 0,
+          flexShrink: 0,
           zIndex: 100,
         }}
       >
@@ -79,11 +76,6 @@ export default function AppLayout() {
             Flowkit
           </Typography.Text>
         </Link>
-        {!isHome && (
-          <Typography.Text type="secondary" style={{ marginLeft: 8, fontSize: 13 }}>
-            / 项目详情
-          </Typography.Text>
-        )}
         <div style={{ marginLeft: 'auto' }}>
           <Space>
             {tokenSnapshot ? (
@@ -114,14 +106,11 @@ export default function AppLayout() {
         </div>
       </Header>
 
-      {/* 主内容区 */}
+      {/* 主内容区 —— 铺满 Header 以下所有空间，不限宽 */}
       <Content
         style={{
-          padding: '24px 16px',
-          maxWidth: 1200,
-          margin: '0 auto',
-          width: '100%',
-          boxSizing: 'border-box',
+          flex: 1,
+          overflow: 'hidden',
         }}
       >
         <Outlet />

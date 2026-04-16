@@ -31,7 +31,7 @@
 |---|---|---|---|---|
 | 需求澄清 | ✅完成 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) | 2026-04-13 | PRD v1.0 已形成需求基线。 |
 | 架构边界 | ✅完成 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) | 2026-04-14 | v0.1 MVP 架构边界已冻结，可支持前后端并行开发。 |
-| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-16 | 已完成真实可编辑流程画布改造：支持新增/删除节点、拖拽、连线、保存草稿，并保持执行态节点抽屉兼容。 |
+| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-16 | 已完成三栏布局改造：全屏画布 + 左侧项目列表 + 右侧节点详情面板；画布支持拖动平移（Pan）和双击新增节点；编辑模式仅 OWNER 可用；路由简化为单页面。 |
 | 后端实现 | ✅完成 | [flowchart-collaboration-backend-summary](../implementation/flowchart-collaboration-backend-summary.md) | 2026-04-15 | 已补齐当前架构下可落地的中危整改：OWNER 审计查询、基础内存限流、submit 原子提交/失败回滚；JWT、项目级访问控制、上传安全与 DTO 校验继续保持。 |
 | QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) | 2026-04-16 | 已完成前端流程图编辑器专项回归：本次改动未发现新增阻塞级缺陷；但运行时联调证据仍未补齐，QA 门禁❌。 |
 | 安全审查 | ✅完成 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) | 2026-04-16 | 第三轮复审完成：VUL-10/11/12/13 全部关闭，安全门禁通过（v0.5）。 |
@@ -57,7 +57,7 @@
 | 2026-04-14 | 后端实现 | JWT 鉴权、RBAC Guard、限流（ThrottlerModule）尚未实现，属安全基线 P0 待补项。 | 安全审查阶段补充，交接给安全审查师。 | 已解除 |
 | 2026-04-14 | 后端实现 | submit() 状态变更与事件发布尚非 DB 事务，正式版本需引入 TypeORM QueryRunner + outbox 模式。 | 切换 PostgreSQL 时同步处理。 | 未解除 |
 | 2026-04-14 | 前端实现 | 流程画布为列表式占位实现，尚未集成 LogicFlow（拖拽编辑、真实有向图渲染）。 | 2026-04-16 已完成前端真实可编辑画布改造（等效能力）：新增/删除节点、拖拽、连线、保存草稿。 | 已解除 |
-| 2026-04-14 | 前端实现 | 后端无 GET /projects 列表接口，项目列表依赖 localStorage（跨浏览器/清缓存后丢失）。 | 后端补 GET /projects 端点后修改 WorkbenchPage。 | 未解除 |
+| 2026-04-14 | 前端实现 | 后端无 GET /projects 列表接口，项目列表依赖 localStorage（跨浏览器/清缓存后丢失）。 | 后端补 GET /projects 端点后修改 WorkbenchPage。 | 已解除 |
 | 2026-04-14 | 前端实现 | MVP 所有节点初始为 READY 状态（后端简化），不符合真实依次解锁语义。 | 切换 PostgreSQL 后验证 predecessorNodeIds + unlockSuccessors 逻辑。 | 未解除 |
 | 2026-04-15 | 安全审查 | 开发态 JWT 当前保存在 localStorage，若进入生产需改为更安全会话方案（如 httpOnly Cookie + CSRF 防护）。 | sessionStorage 迁移完成，满足 MVP 放行条件。 | 已解除 |
 | 2026-04-14 | 安全审查 | 【VUL-01】身份伪造：硬编码 x-user-id 请求头，任何人可伪造身份，直接威胁多租户隔离。 | 实现 JWT 鉴权，移除 x-user-id 信任链（后端 2-4h，前端 2-3h）。 | 已完成（待安全复审） |
@@ -88,7 +88,19 @@
 	- 增加未登录空态引导，降低 401/拦截场景的操作迷惑。
 - 做小幅性能优化：流程画布拓扑排序与映射构建改为 `useMemo`，减少重复计算与不必要重渲染。
 - 完成交接：to_qa（回归验证 Bearer 链路与核心闭环）、to_security（会话存储与鉴权链路复审）、to_docs（补充用户侧“获取开发令牌”操作说明）。
+### 前端（2026-04-16 三栏布局改造）
 
+- 整体布局改造为三栏全屏：左侧项目列表面板（240px，可折叠） + 中间全屏画布 + 右侧节点详情面板（360px，选中节点时显示）。
+- 新增 `ProjectListPanel` 组件：调用新 `GET /api/v1/projects` 接口获取项目列表，按"我负责的 / 我参与的"分大类，再按"未开始 / 进行中 / 已完成"进度状态分子类；未登录时从 localStorage 降级读取。
+- 新增 `NodeDetailPanel` 组件：将原 `NodeDetailDrawer`（Drawer 抽屉）改造为右侧固定面板，保持全部原有功能（节点信息、开始执行、提交、门禁结果、文档绑定）。
+- FlowCanvas 全屏画布改造：画布铺满中间区域、支持拖动平移（Pan）、点阵网格背景跟随移动、transform 变换层统一管理节点和连线偏移。
+- 双击画布空白区域新增节点：弹出 Modal 表单填写节点名称、描述、输出物要求列表（可动态增减行），确认后在逻辑坐标位置创建节点。
+- 编辑模式 OWNER 限定：仅当前用户 role === 'OWNER' 时显示"编辑模式"切换按钮。
+- 路由简化：移除 `/projects/:projectId` 路由，主页面直接渲染三栏布局，项目切换通过左侧面板完成。
+- 新增 `MainWorkspace` 页面组件：统一编排三栏布局与数据流。
+- 新增 API 类型：`ProjectProgress`、`ProjectListItem`；新增 `getMyProjects()` 接口函数。
+- AppLayout 改造：Content 区域移除 maxWidth/padding 限制，改为 flex:1 + overflow:hidden 以支持全屏三栏。
+- CSS 全面重写：新增三栏布局、项目列表面板、节点详情面板、全屏画布容器、工具栏样式。
 ### 后端（2026-04-15）
 
 - 完成 JWT Bearer 基础鉴权：新增 `POST /api/v1/auth/token`（开发签发测试 token），全局守卫校验 `Authorization: Bearer <token>`，并移除 `x-user-id` 信任链。
@@ -98,7 +110,11 @@
 - 新增审计查询能力：落地 `GET /api/v1/projects/:projectId/audit-logs`，支持 `resourceType/resourceId` 可选过滤；仅项目 OWNER 可访问，返回请求追踪与操作主体字段。
 - 新增基础限流：实现最小内存限流守卫并挂载到 `POST /auth/token`、`POST /projects`、`POST /projects/:projectId/documents`、`POST /executions/:executionId/start|submit|artifacts/bind`，超限返回 `429 RATE_LIMITED`。
 - 缓解 submit 一致性风险：`submit()` 改为“先计算/暂存，再统一提交”，若门禁、后继解锁、通知、审计任一步骤异常，则回滚 execution、后继节点更新和内存队列写入，避免 execution 长时间停留在 `GATE_CHECKING` 或出现半更新。
-- 更新最小可运行说明：`apps/api/README.md` 切换为 JWT 调用示例并补充 401/403 验证步骤。
+### 后端（2026-04-16）
+
+- 新增 `GET /api/v1/projects` 接口：返回当前已认证用户参与的所有项目列表，包含用户在项目中的角色（OWNER/MEMBER/VIEWER）及节点执行进度摘要（totalNodes/completedNodes/inProgressNodes）。
+- `ProjectsService` 新增 `findByUser(userId)` 方法：遍历 `store.projectMembers` 筛选用户参与项目，附带进度统计。
+- 该接口由全局 JwtAuthGuard 保护，未认证请求返回 401。- 更新最小可运行说明：`apps/api/README.md` 切换为 JWT 调用示例并补充 401/403 验证步骤。
 
 ## 版本历史
 
@@ -125,4 +141,4 @@
 | 2026-04-16 | v1.9 | 文档撰写员 | 同步第三轮安全复审与 QA 结论：安全门禁更新为✅通过（v0.5），发布门禁保留❌（仅阻塞运行时联调证据）；并更新阻塞记录口径。 | 回传项目总协调，用于发布申请重评估前的状态对齐 |
 | 2026-04-16 | v2.0 | 前端专家 | 完成前端真实可编辑流程画布改造：ProjectPage 新增执行/编辑双模式，支持新增/删除节点、拖拽、连线与保存草稿；回写前端阶段状态、实现摘要与风险解除记录。 | 交接 to_qa / to_security / to_docs |
 | 2026-04-16 | v2.1 | QA 专家 | 完成前端流程图编辑器专项回归：覆盖可视化画布、编辑能力、保存一致性、执行态抽屉兼容、前端类型检查；确认本次改动无新增阻塞级缺陷，项目整体阻塞项仍为历史遗留“运行时联调证据缺失”。 | 回传项目总协调，待补齐运行时联调证据后复核 QA 门禁 |
-| 2026-04-16 | v2.2 | 文档撰写员 | 同步前端“流程图编辑器已实现”文档：更新用户指南中的流程画布与编辑模式操作、修订已知限制为轻量真实画布口径，并修复前端实现总结新增节 Markdown 规范问题（表格分隔行空格、硬 tab/列表缩进）。 | 回传项目总协调，用于文档与当前代码一致性维护 |
+| 2026-04-16 | v2.2 | 文档撰写员 | 同步前端“流程图编辑器已实现”文档：更新用户指南中的流程画布与编辑模式操作、修订已知限制为轻量真实画布口径，并修复前端实现总结新增节 Markdown 规范问题（表格分隔行空格、硬 tab/列表缩进）。 | 回传项目总协调，用于文档与当前代码一致性维护 || 2026-04-16 | v2.3 | 前端专家 | 完成三栏布局改造：全屏画布+左侧项目列表+右侧节点详情面板；新增 ProjectListPanel/NodeDetailPanel/MainWorkspace 组件；FlowCanvas 支持平移和双击新增节点；路由简化为单页面；编辑模式 OWNER 限定。 | 交接 to_qa / to_docs |

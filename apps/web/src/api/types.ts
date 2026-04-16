@@ -20,11 +20,30 @@ export interface Project {
   createdAt: string;
 }
 
-/** 本地持久化的项目摘要（因后端无列表接口，存储到 localStorage） */
+/** 本地持久化的项目摘要（降级到 localStorage 时使用） */
 export interface ProjectSummary {
   projectId: string;
   name: string;
   createdAt: string;
+}
+
+/** 项目进度摘要 */
+export interface ProjectProgress {
+  totalNodes: number;
+  completedNodes: number;
+  inProgressNodes: number;
+}
+
+/** 项目列表项（GET /api/v1/projects 返回） */
+export interface ProjectListItem {
+  projectId: string;
+  name: string;
+  description?: string;
+  status: string;
+  role: 'OWNER' | 'MEMBER' | 'VIEWER';
+  createdAt: string;
+  updatedAt: string;
+  progress: ProjectProgress;
 }
 
 /** 输出物要求 */

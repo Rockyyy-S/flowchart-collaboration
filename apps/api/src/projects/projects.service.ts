@@ -109,4 +109,74 @@ export class ProjectsService {
     }
     return project;
   }
+
+  /**
+   * 查询用户参与的所有项目列表
+   * - 遍历 projectMembers 筛选当前用户参与的项目
+   * - 附带用户在项目中的角色和节点执行进度摘要
+   */
+  findByUser(userId: string): Array<{
+    projectId: string;
+    name: string;
+    description?: string;
+    status: string;
+    role: string;
+    createdAt: Date;
+    updatedAt: Date;
+    progress: {
+      totalNodes: number;
+      completedNodes: number;
+      inProgressNodes: number;
+    };
+  }> {
+    // 从 projectMembers 中找出该用户参与的所有记录
+    const memberEntries: Array<{ projectId: string; role: string }> = [];
+    for (const member of this.store.projectMembers.values()) {
+      if (member.userId === userId) {
+        memberEntries.push({
+          projectId: member.projectId,
+          role: member.role,
+        });
+      }
+    }
+
+    // 组装每个项目的详情与执行进度
+    const result = [];
+    for (const entry of memberEntries) {
+      const project = this.store.projects.get(entry.projectId);
+      if (!project) continue; // 防御性跳过：成员记录指向的项目可能已被删除
+
+      // 计算该项目的节点执行进度
+      let totalNodes = 0;
+      let completedNodes = 0;
+      let inProgressNodes = 0;
+      for (const exec of this.store.nodeExecutions.values()) {
+        if (exec.projectId === entry.projectId) {
+          totalNodes++;
+          if (exec.status === 'COMPLETED') {
+            completedNodes++;
+          } else if (exec.status === 'IN_PROGRESS' || exec.status === 'GATE_CHECKING') {
+            inProgressNodes++;
+          }
+        }
+      }
+
+      result.push({
+        projectId: project.id,
+        name: project.name,
+        description: project.description,
+        status: project.status,
+        role: entry.role,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+        progress: {
+          totalNodes,
+          completedNodes,
+          inProgressNodes,
+        },
+      });
+    }
+
+    return result;
+  }
 }

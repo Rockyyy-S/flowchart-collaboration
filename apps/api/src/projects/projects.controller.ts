@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   Req,
   HttpCode,
@@ -17,6 +18,18 @@ import { AuthenticatedRequest } from '../common/interfaces/authenticated-request
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
+
+  /**
+   * 获取当前用户参与的所有项目列表
+   * GET /api/v1/projects
+   * Header: Authorization: Bearer <token>
+   * 返回项目基本信息、用户角色及节点执行进度摘要
+   */
+  @Get()
+  findAll(@Req() req: AuthenticatedRequest) {
+    const userId = req.user?.userId as string;
+    return this.projectsService.findByUser(userId);
+  }
 
   /**
    * 创建项目
