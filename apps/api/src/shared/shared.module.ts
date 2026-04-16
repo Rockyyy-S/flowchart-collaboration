@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { StoreService } from './store.service';
+import { ProjectOwnerGuard } from '../common/guards/project-owner.guard';
+import { MemoryRateLimitGuard } from '../common/guards/memory-rate-limit.guard';
 
 /**
  * 全局共享模块
@@ -7,7 +9,7 @@ import { StoreService } from './store.service';
  */
 @Global()
 @Module({
-  providers: [StoreService],
-  exports: [StoreService],
+  providers: [StoreService, ProjectOwnerGuard, MemoryRateLimitGuard],
+  exports: [StoreService, ProjectOwnerGuard, MemoryRateLimitGuard],
 })
 export class SharedModule {}

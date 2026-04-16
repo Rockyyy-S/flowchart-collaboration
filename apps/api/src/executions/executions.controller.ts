@@ -8,18 +8,24 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { ExecutionsService } from './executions.service';
 import { StartExecutionDto } from './dto/start-execution.dto';
 import { SubmitExecutionDto } from './dto/submit-execution.dto';
 import { BindArtifactDto } from './dto/bind-artifact.dto';
+import { ProjectAccessGuard } from '../common/guards/project-access.guard';
+import { ExecutionAccessGuard } from '../common/guards/execution-access.guard';
+import { RateLimit } from '../common/decorators/rate-limit.decorator';
+import { MemoryRateLimitGuard } from '../common/guards/memory-rate-limit.guard';
+import { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 
 /**
  * 项目维度的执行列表查询
  * 路由前缀：projects（与 ProjectsController 共享前缀，NestJS 允许多 Controller 共享）
  */
 @Controller('projects')
+@UseGuards(ProjectAccessGuard)
 export class ProjectExecutionsController {
   constructor(private readonly executionsService: ExecutionsService) {}
 
@@ -49,6 +55,7 @@ export class ProjectExecutionsController {
 
 /** 执行实例动作接口 */
 @Controller('executions')
+@UseGuards(ExecutionAccessGuard)
 export class ExecutionsController {
   constructor(private readonly executionsService: ExecutionsService) {}
 
@@ -57,14 +64,21 @@ export class ExecutionsController {
    * POST /api/v1/executions/:executionId/start
    */
   @Post(':executionId/start')
+  @UseGuards(MemoryRateLimitGuard)
+  @RateLimit({
+    keyPrefix: 'start-execution',
+    limit: 20,
+    windowMs: 60_000,
+    identifyBy: 'user',
+  })
   @HttpCode(HttpStatus.OK)
   start(
     @Param('executionId') executionId: string,
     @Body() dto: StartExecutionDto,
-    @Req() req: Request,
+    @Req() req: AuthenticatedRequest,
   ) {
-    const actorId = (req.headers['x-user-id'] as string) || 'anonymous';
-    const requestId = (req as any).requestId || 'unknown';
+    const actorId = req.user?.userId as string;
+    const requestId = req.requestId || 'unknown';
     const execution = this.executionsService.start(
       executionId,
       dto,
@@ -83,14 +97,21 @@ export class ExecutionsController {
    * POST /api/v1/executions/:executionId/submit
    */
   @Post(':executionId/submit')
+  @UseGuards(MemoryRateLimitGuard)
+  @RateLimit({
+    keyPrefix: 'submit-execution',
+    limit: 20,
+    windowMs: 60_000,
+    identifyBy: 'user',
+  })
   @HttpCode(HttpStatus.OK)
   submit(
     @Param('executionId') executionId: string,
     @Body() dto: SubmitExecutionDto,
-    @Req() req: Request,
+    @Req() req: AuthenticatedRequest,
   ) {
-    const actorId = (req.headers['x-user-id'] as string) || 'anonymous';
-    const requestId = (req as any).requestId || 'unknown';
+    const actorId = req.user?.userId as string;
+    const requestId = req.requestId || 'unknown';
     const execution = this.executionsService.submit(
       executionId,
       dto,
@@ -120,14 +141,21 @@ export class ExecutionsController {
    * POST /api/v1/executions/:executionId/artifacts/bind
    */
   @Post(':executionId/artifacts/bind')
+  @UseGuards(MemoryRateLimitGuard)
+  @RateLimit({
+    keyPrefix: 'bind-artifact',
+    limit: 30,
+    windowMs: 60_000,
+    identifyBy: 'user',
+  })
   @HttpCode(HttpStatus.CREATED)
   bindArtifact(
     @Param('executionId') executionId: string,
     @Body() dto: BindArtifactDto,
-    @Req() req: Request,
+    @Req() req: AuthenticatedRequest,
   ) {
-    const actorId = (req.headers['x-user-id'] as string) || 'anonymous';
-    const requestId = (req as any).requestId || 'unknown';
+    const actorId = req.user?.userId as string;
+    const requestId = req.requestId || 'unknown';
     const binding = this.executionsService.bindArtifact(
       executionId,
       dto,

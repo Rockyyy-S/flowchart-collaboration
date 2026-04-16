@@ -6,9 +6,11 @@ import { ProjectsModule } from './projects/projects.module';
 import { FlowsModule } from './flows/flows.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ExecutionsModule } from './executions/executions.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
+    AuthModule,         // JWT 鉴权与发 token 接口
     SharedModule,        // 全局内存存储（@Global，隐式提供 StoreService）
     AuditModule,         // 审计日志服务
     NotificationsModule, // 通知占位服务

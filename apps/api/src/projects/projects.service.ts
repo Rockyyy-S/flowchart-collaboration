@@ -81,6 +81,7 @@ export class ProjectsService {
     }
 
     this.auditService.record({
+      projectId,
       requestId,
       actorId,
       action: 'CREATE_PROJECT',

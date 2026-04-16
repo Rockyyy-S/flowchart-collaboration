@@ -120,6 +120,7 @@ export interface Document {
 /** 审计日志（所有写操作必须落此记录） */
 export interface AuditLog {
   id: string;
+  projectId: string;
   requestId: string;
   actorId: string;
   action: string;

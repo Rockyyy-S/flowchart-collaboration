@@ -7,10 +7,17 @@ import {
 import { GateEngineService } from './gate-engine.service';
 import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ProjectAccessGuard } from '../common/guards/project-access.guard';
+import { ExecutionAccessGuard } from '../common/guards/execution-access.guard';
 
 @Module({
   imports: [AuditModule, NotificationsModule],
-  providers: [ExecutionsService, GateEngineService],
+  providers: [
+    ExecutionsService,
+    GateEngineService,
+    ProjectAccessGuard,
+    ExecutionAccessGuard,
+  ],
   controllers: [ExecutionsController, ProjectExecutionsController],
   exports: [ExecutionsService],
 })

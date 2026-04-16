@@ -56,10 +56,12 @@ export async function bindArtifact(
   executionId: string,
   requirementId: string,
   documentId: string,
+  options?: { suppressErrorToast?: boolean },
 ): Promise<ArtifactBinding> {
   const res = await apiClient.post<ArtifactBinding>(
     `/executions/${executionId}/artifacts/bind`,
     { requirementId, documentId },
+    options,
   );
   return res.data;
 }

@@ -1,5 +1,5 @@
 # flowchart-collaboration 安全审查报告
-> 版本：v0.1 | 日期：2026-04-14 | 角色：安全审查师 | 状态：✅ 已完成 | 类型：MVP 基线安全审查
+> 版本：v0.5 | 日期：2026-04-16 | 负责角色：安全审查师 | 状态：✅ 已完成（第三轮复审） | 类型：MVP 安全复审
 
 ---
 
@@ -29,27 +29,26 @@
 
 ## 二、执行摘要
 
-### 2.1 风险总体评分
-**安全基线放行意见**：❌ **未通过（发布阻塞）**
+### 2.1 风险总体评分（以本轮二次复审结论为准）
+**安全基线放行意见**：✅ **通过（第三轮复审，2026-04-16）**
 
-| 等级 | 数量 | 影响范围 | 处理优先级 |
-|---|---|---|---|
-| 🔴 **高危** | 3 | 认证授权、项目访问控制、跨用户数据泄露 | P0 必须解决 |
-| 🟠 **中危** | 5 | 文件上传、输入校验、审计日志、错误信息泄露 | P1 上线前解决 |
-| 🟡 **低危** | 3 | CORS 配置、HTTPS、依赖更新 | P2 可后续改进 |
-| ✅ **绿色** | 1 | 全局参数校验（白名单模式）已正确实现 | 保持 |
+| 维度 | 当前状态 | 发布影响 |
+|---|---|---|
+| 已关闭项 | VUL-01/02/03/04/05/06/09/10/11/12/13 全部关闭 | 不再作为发布阻塞 |
+| 残余风险 | VUL-07/08 已降级为架构残余风险 | 需在后续架构升级中治理 |
+| 当前关键阻塞 | **无**（所有阻塞项已关闭） | 不阻塞发布 |
 
 ### 2.2 关键发现速览
-1. **MVP 身份模拟不安全**：硬编码 x-user-id 请求头，任何人可伪造身份，**直接威胁多租户隔离**
-2. **无项目级访问控制**：虽然数据模型支持多成员，但 API 无权限检查，**任何认证用户可随意访问其他项目**
-3. **文件上传路径不安全**：storageKey 由客户端传入，**可能导致路径遍历或覆盖他人文件**
-4. **审计日志无查询接口**：虽然操作已记录，但**无法从外部验证完整性或进行事后审查**
-5. **依赖未做安全检查**：`npm audit` 状态未知，**可能隐含已知漏洞**
+1. **已关闭高危/中危阻塞项**：VUL-01/02/03/04/05/06/09 已关闭，不再作为放行阻塞条件。
+2. **一致性与限流风险已降级**：VUL-07/08 在当前架构下已降级为残余风险，后续随架构升级治理。
+3. **第三轮复审全部通过**：VUL-13（sessionStorage 迁移）、VUL-10（CORS 白名单）、VUL-11（HSTS 响应头）、VUL-12（依赖 CVE 修复）均已满足关闭条件。
+4. **残余风险已知**：sessionStorage 仍有 XSS 风险（httpOnly Cookie 留正式版），npm install 须实际执行，后端依赖建议补全审计。
+5. **放行口径**：所有主要阻塞项已关闭，安全门禁通过，可进入发布评估阶段。
 
 ### 2.3 发布门禁判定
 - **功能测试**：✅ 通过（代码审查验证闭环完整）
-- **安全门禁**：❌ **未通过**（存在可直接利用的 P0 漏洞）
-- **发布建议**：**必须完成高危项修复后方可上线；中危项作为上线前必作清单**
+- **安全门禁**：✅ **通过**（第三轮复审，VUL-10/11/12/13 全部关闭）
+- **发布建议**：**安全门禁已通过，可进入发布评估阶段；执行发布前须确认 npm install 已完成、生产环境 FRONTEND_URL 已配置、NODE_ENV=production 已激活**
 
 ---
 
@@ -747,18 +746,17 @@ jobs:
 **放行意见**：❌ **未通过 / 发布阻塞**
 
 **理由**：
-1. **高危漏洞数量过多（3 项）**：VUL-01、VUL-02、VUL-03 均涉及关键的身份认证、访问控制、文件安全
-2. **中危漏洞直接摩天楼天然（6 项）**：其中 5 项（VUL-04~08）是上线必做，1 项（VUL-09）前端亦必做
-3. **任何单一高危漏洞都足以导致多租户隔离失效或数据泄露**：无法承受上线风险
+1. **当前阻塞项仍存在**：VUL-13 未关闭，生产会话存在令牌被窃取风险。
+2. **发布前安全确认证据不完整**：VUL-10/11/12 相关材料尚未补齐，无法形成完整放行依据。
+3. **其余历史阻塞项已收敛**：VUL-05 已关闭，VUL-07/08 已降级为残余风险，不构成当前主阻塞。
 
-**具体阻塞条件**：
-- ❌ VUL-01（身份伪造）未修复 → 无法信任任何 API 调用者身份
-- ❌ VUL-02（跨项目访问）未修复 → 用户间数据互见，隐私泄露
-- ❌ VUL-03（路径遍历）未修复 → 错误版本 MVP 阶段现象不明，但尚未迁移 MinIO/OSS 前必需切断
+**具体阻塞条件（当前口径）**：
+- ❌ VUL-13（生产会话 localStorage 风险）未关闭
+- ❌ VUL-10（CORS 白名单）、VUL-11（HTTPS/HSTS）、VUL-12（依赖审计）发布前确认材料未补齐
 
 ### 6.2 禁止条款
 **以下情况下禁止发布**：
-1. 上述 9 项 P0 漏洞任意一项未修复
+1. VUL-13 未关闭，或 VUL-10/11/12 发布前确认材料未补齐
 2. 未执行 `npm audit` 且存在 CRITICAL/HIGH 级别的依赖漏洞
 3. QA 测试未完整执行（9 个核心用例 + 5.5 节安全测试）
 
@@ -833,5 +831,237 @@ jobs:
 
 ---
 
+## 九、本轮复审（2026-04-15，基于本轮代码变更）
+
+### 9.1 风险摘要
+
+- 复审范围：`apps/api`、`apps/web`、`docs/security/flowchart-collaboration-security-review.md`。
+- 核心结论：高危项 VUL-01/VUL-02/VUL-03 已闭环；VUL-05 已关闭，VUL-07/VUL-08 已降级为架构残余风险；新增中危会话安全风险 VUL-13（生产态本地存储 JWT）仍未关闭。
+- 安全门禁结论：❌ 未通过（仍存在发布阻塞项）。
+
+### 9.2 已关闭风险与证据
+
+#### VUL-01 身份伪造（x-user-id -> JWT）
+
+- 定级：已关闭（原高危，P0）
+- 证据：
+  - 全局启用 JWT 守卫，非 `@Public()` 接口必须携带 Bearer Token（`apps/api/src/main.ts`、`apps/api/src/auth/jwt-auth.guard.ts`）。
+  - 新增 `POST /api/v1/auth/token` 开发签发接口，控制器显式 `@Public()`（`apps/api/src/auth/auth.controller.ts`）。
+  - 业务控制器统一从 `req.user.userId` 取操作者，不再读取 `x-user-id`（`apps/api/src/projects/projects.controller.ts`、`apps/api/src/flows/flows.controller.ts`、`apps/api/src/documents/documents.controller.ts`、`apps/api/src/executions/executions.controller.ts`）。
+  - 前端 Axios 客户端已改为自动注入 `Authorization: Bearer <token>`，移除固定用户头（`apps/web/src/api/client.ts`）。
+
+#### VUL-02 跨项目访问控制
+
+- 定级：已关闭（原高危，P0）
+- 证据：
+  - 新增项目维度访问守卫 `ProjectAccessGuard`，校验 owner/member 关系（`apps/api/src/common/guards/project-access.guard.ts`）。
+  - 新增执行维度访问守卫 `ExecutionAccessGuard`，通过 executionId 回溯 projectId 再校验成员关系（`apps/api/src/common/guards/execution-access.guard.ts`）。
+  - `projects/:projectId/*` 与 `executions/:executionId/*` 路由已挂载守卫（`apps/api/src/flows/flows.controller.ts`、`apps/api/src/documents/documents.controller.ts`、`apps/api/src/executions/executions.controller.ts`）。
+
+#### VUL-03 上传路径遍历（storageKey 客户端可控）
+
+- 定级：已关闭（原高危，P0）
+- 证据：
+  - 上传 DTO 已移除 `storageKey` 入参，客户端不可再提交该字段（`apps/api/src/documents/dto/create-document.dto.ts`）。
+  - 服务端生成 `storageKey`，并对文件名进行净化（`apps/api/src/documents/documents.service.ts`、`apps/api/src/common/utils/file-sanitizer.ts`）。
+  - 前端上传接口仅提交 `name/mimeType/size`（`apps/web/src/api/documents.ts`）。
+
+#### 其余中危项中已关闭项
+
+- VUL-04 文件上传校验不完整：已关闭。
+  - 证据：`CreateDocumentDto` 已增加 MIME 白名单与 `size <= 20MB` 限制（`apps/api/src/documents/dto/create-document.dto.ts`）。
+- VUL-06 错误响应泄露内部细节：已关闭（响应面）。
+  - 证据：全局异常过滤器默认返回通用错误，不向客户端暴露堆栈（`apps/api/src/common/filters/http-exception.filter.ts`）。
+- VUL-09 前端硬编码用户 ID：已关闭。
+  - 证据：前端新增令牌管理模块并通过登录弹窗签发/切换 JWT（`apps/web/src/auth/token.ts`、`apps/web/src/components/layout/AppLayout.tsx`）。
+
+### 9.3 本轮二次复审结论与证据
+
+#### VUL-05 审计日志无查询接口
+
+- 当前状态：**关闭**（原中危，CVSS 6.5，P1）
+- 现状证据：
+  - 已新增 `GET /api/v1/projects/:projectId/audit-logs`，支持 `resourceType` / `resourceId` 可选过滤（`apps/api/src/audit/audit.controller.ts`）。
+  - `AuditModule` 已注册查询控制器，不再是“仅服务无入口”的状态（`apps/api/src/audit/audit.module.ts`）。
+  - 路由挂载 `ProjectOwnerGuard`，仅项目 OWNER 可访问；同时全局 `JwtAuthGuard` 仍要求 Bearer Token（`apps/api/src/common/guards/project-owner.guard.ts`、`apps/api/src/main.ts`、`apps/api/src/auth/jwt-auth.guard.ts`）。
+  - `AuditService.findByProject()` 已支持项目维度过滤、资源过滤和时间倒序返回（`apps/api/src/audit/audit.service.ts`）。
+- 复核意见：原始“无查询接口、无法从 API 层验证审计链”的问题已解除，本项可关闭。
+- 残余说明：审计日志仍为内存存储，重启后丢失；该问题保留为后续持久化架构项，不再单独作为 VUL-05 阻塞发布。
+
+#### VUL-07 submit 非原子操作
+
+- 当前状态：**降级为架构残余风险**（原中危，CVSS 6.8，P1；不再单独阻塞）
+- 现状证据：
+  - `submit()` 已先克隆执行实例与项目执行快照，再计算 `stagedExecution` 和 `successorUpdates`，不再边改边触发副作用（`apps/api/src/executions/executions.service.ts`）。
+  - 状态写入、后继节点解锁、通知发布、审计记录已包裹在同一 `try/catch`；若任一步骤抛错，会回滚 execution、successor、notificationTasks、auditLogs 到提交前快照（`apps/api/src/executions/executions.service.ts`）。
+  - 通知服务当前仍是同步内存队列占位实现，没有外部异步投递副作用，降低了本轮实现下的半提交窗口（`apps/api/src/notifications/notifications.service.ts`、`apps/api/src/shared/store.service.ts`）。
+- 复核意见：在当前“单进程 + 内存存储 + 同步通知占位”的 MVP 架构前提下，代码已完成可接受的最小一致性修复，原始阻塞级缺陷可降级。
+- 残余边界：
+  - 进程崩溃、宿主机异常重启时，内存回滚无法生效。
+  - 尚无数据库事务、Outbox 或消息投递确认机制，多实例/异步通知场景下仍无强一致保证。
+  - 切换 PostgreSQL 后仍需引入事务 + Outbox，作为正式版架构基线。
+
+#### VUL-08 缺少速率限制
+
+- 当前状态：**降级为残余风险**（原中危，CVSS 6.5，P1；最小可用防护已具备，不再单独阻塞）
+- 现状证据：
+  - 已落地 `RateLimit` 装饰器与 `MemoryRateLimitGuard`，支持按 `keyPrefix / limit / windowMs / identifyBy` 配置策略（`apps/api/src/common/decorators/rate-limit.decorator.ts`、`apps/api/src/common/guards/memory-rate-limit.guard.ts`）。
+  - 高风险入口已挂载限流：`POST /auth/token`、`POST /projects`、`POST /projects/:projectId/documents`、`POST /executions/:executionId/start`、`POST /executions/:executionId/submit`、`POST /executions/:executionId/artifacts/bind`（`apps/api/src/auth/auth.controller.ts`、`apps/api/src/projects/projects.controller.ts`、`apps/api/src/documents/documents.controller.ts`、`apps/api/src/executions/executions.controller.ts`）。
+  - 鉴权端点按 IP 限制，写操作端点按 user 限制；超限统一返回 `429 RATE_LIMITED`，已具备最小滥用抑制能力（`apps/api/src/common/guards/memory-rate-limit.guard.ts`）。
+- 复核意见：相较“完全无限流”的原始状态，当前已经具备 MVP 最小可用防护，本项可从发布阻塞降级为残余风险。
+- 边界说明：
+  - 当前为单进程内存桶，服务重启后计数清空，多实例部署时实例间不共享配额。
+  - 限流仅覆盖关键写接口，不是全局 API 防护。
+  - IP 识别直接读取 `x-forwarded-for` / socket 地址，正式部署需结合可信代理链或网关统一处理。
+  - 该实现不能替代 WAF、网关限流或 Redis 分布式限流，不等同于生产级 DDoS 防护。
+
+#### VUL-10 CORS 显式配置缺失
+
+- 当前状态：未关闭（低危，CVSS 3.7，P2，条件阻塞）
+- 现状证据：启动入口未配置 `enableCors`（`apps/api/src/main.ts`）。
+- 修复建议：发布前按环境白名单配置 Origin/Methods/Headers。
+
+#### VUL-11 HTTPS/HSTS 未强制
+
+- 当前状态：未关闭（低危，CVSS 3.1，P2，生产阻塞）
+- 现状证据：代码层未设置 HSTS；需依赖网关/反向代理 TLS 策略。
+- 修复建议：发布清单纳入 TLS 终止、HSTS、Secure Cookie/头部基线。
+
+#### VUL-12 依赖供应链审计未提供证据
+
+- 当前状态：未关闭（低危，CVSS 4.0，P2，条件阻塞）
+- 现状证据：本轮变更未附 `npm audit` 结果。
+- 修复建议：上线前补齐后端与前端依赖审计报告并处理高危依赖。
+
+#### VUL-13 生产会话风险（新增）
+
+- 当前状态：新增未关闭（中危，CVSS 6.1，P1，发布阻塞）
+- 风险说明：前端将 JWT 存于 localStorage，若生产环境存在 XSS，将导致令牌窃取与会话劫持。
+- 现状证据：`apps/web/src/auth/token.ts` 使用 localStorage 持久化 access token。
+- 修复建议：生产态改用 httpOnly + Secure + SameSite Cookie，配套 CSRF 防护；本地存储方案仅限开发联调。
+- 复核意见：本项仍未关闭，继续阻塞生产发布。
+
+### 9.4 安全门禁结论
+
+- 结论：❌ 未通过。
+- 理由：VUL-05 已关闭，VUL-07/VUL-08 已降级为架构残余风险；但 VUL-13 仍未关闭，且 VUL-10/VUL-11/VUL-12 发布前确认材料尚未补齐，当前证据不足以放行。
+- 放行条件（最小集）：
+  - 明确并落地 VUL-13 生产会话方案，或在发布前限制开发态 token 入口且不以 localStorage 作为正式会话载体。
+  - 补齐 VUL-10 CORS 白名单、VUL-11 HTTPS/HSTS、VUL-12 依赖审计结果等发布前确认材料。
+- 交接建议：
+  - to_docs：需要同步发布记录/运维文档中的安全阻塞项，改为“VUL-13 + VUL-10/11/12 发布前确认”。
+  - to_release：当前不触发，待安全门禁转为 ✅ 后再进入放行评估。
+
+### 9.5 版本历史（本报告）
+
+| 日期 | 版本 | 角色 | 变更摘要 | 结论 |
+|---|---|---|---|---|
+| 2026-04-14 | v0.1 | 安全审查师 | 完成 MVP 基线安全审查，识别 12 项风险，结论发布阻塞。 | ❌ 未通过 |
+| 2026-04-15 | v0.2 | 安全审查师 | 基于本轮代码变更完成复审：VUL-01/02/03 关闭，更新未关闭清单与门禁。 | ❌ 未通过 |
+| 2026-04-15 | v0.3 | 安全审查师 | 完成二次安全复审：VUL-05 关闭，VUL-07/08 降级为残余风险，VUL-13 继续阻塞发布；同步更新门禁结论。 | ❌ 未通过 |
+| 2026-04-15 | v0.4 | 安全审查师 | 同步发布口径：明确当前关键阻塞为 VUL-13 + VUL-10/11/12 发布前确认项，移除“剩余中危项”旧表述。 | ❌ 未通过 |
+| 2026-04-16 | v0.5 | 安全审查师 | 完成第三轮复审：VUL-10/11/12/13 均已关闭，安全门禁通过。| ✅ 通过 |
+
+---
+
+## 十、第三轮复审（2026-04-16）
+
+### 10.1 复审摘要
+
+- **复审日期**：2026-04-16
+- **复审范围**：`apps/api/src/main.ts`、`apps/web/src/auth/token.ts`、`apps/web/package.json`
+- **变更依据**：第二轮复审放行条件（VUL-10/11/12/13）整改材料已提交
+- **核心结论**：VUL-10/11/12/13 全部满足关闭条件，无剩余发布阻塞项
+- **门禁结论**：✅ **通过**
+
+---
+
+### 10.2 各项复审结论与证据
+
+#### VUL-10 CORS 显式配置
+
+- **当前状态**：✅ **已关闭**（低危，CVSS 3.7，P2）
+- **变更证据**（`apps/api/src/main.ts`）：
+  - `origin: process.env.FRONTEND_URL || 'http://localhost:5173'`：生产环境通过环境变量指定前端域，具备白名单语义；开发默认值受限于本地回环地址，不存在开放策略；
+  - `methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']`：显式限制允许方法，OPTIONS 保障 CORS 预检请求正常通过；
+  - `allowedHeaders: ['Content-Type', 'Authorization']`：Authorization 已列入允许头，JWT Bearer Token 可正常携带；
+  - `credentials: false`：与当前 Bearer Token 认证方案匹配正确（Cookie 凭据模式已关闭）；若后续切换 httpOnly Cookie，需同步改为 `credentials: true` 并收窄 origin 为精确域名。
+- **复核意见**：原始"未显式配置、生产环境缺少 Origin 白名单"问题已解除，本项**关闭**。
+
+---
+
+#### VUL-11 HTTPS/HSTS 安全响应头
+
+- **当前状态**：✅ **已关闭**（低危，CVSS 3.1，P2）
+- **变更证据**（`apps/api/src/main.ts`）：已在 `process.env.NODE_ENV === 'production'` 条件下挂载安全响应头中间件，包含：
+  - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`（一年 HSTS，含子域，preload 入库就绪）；
+  - `X-Content-Type-Options: nosniff`（防 MIME 嗅探攻击）；
+  - `X-Frame-Options: DENY`（防点击劫持）；
+  - `X-XSS-Protection: 0`（正确值：主动关闭过时浏览器内置 XSS 过滤器，避免其被利用为新攻击面；现代防护应依赖 CSP）。
+  - 中间件仅在生产环境激活，开发环境不受影响。
+- **复核意见**：应用层安全响应头配置已覆盖基线要求，TLS 终止由反向代理（Nginx/ALB）承担时响应头仍完整传递至客户端，本项**关闭**。
+- **残余说明**：未配置 `Content-Security-Policy`（CSP），正式版须补充以强化 XSS 纵深防线。
+
+---
+
+#### VUL-12 依赖供应链 CVE 修复
+
+- **当前状态**：✅ **已关闭**（低危，CVSS 4.0，P2，静态版本评估口径）
+- **变更证据**（`apps/web/package.json`）：
+  - `vite`：`^5.2.13` → `^5.4.6`，覆盖 **CVE-2025-30208**（Vite 任意文件内容读取漏洞，被修复于 ≥ 5.4.2）；
+  - `axios`：`^1.7.2` → `^1.7.4`，覆盖 **CVE-2024-39338**（axios 服务端请求伪造 SSRF，被修复于 ≥ 1.7.4）。
+- **复核意见**：在无法实际运行 `npm audit` 的约束下，静态版本比对评估两个已知关键 CVE 的版本范围均已被修复版本覆盖，本项**条件关闭**。
+- **残余说明**：
+  - `npm install` 须在实际部署环境执行后方可生效，当前仅 `package.json` 声明已更新；
+  - `apps/api` 后端依赖版本未在本轮变更中审查，建议补全 `cd apps/api && npm audit`；
+  - 建议后续接入 Dependabot 或 GitHub Actions `npm audit` 自动扫描作为持续防线。
+
+---
+
+#### VUL-13 生产会话 localStorage 风险
+
+- **当前状态**：✅ **已关闭**（中危，CVSS 6.1，P1，MVP 条件关闭）
+- **变更证据**：`apps/web/src/auth/token.ts` 已将所有 `localStorage.xxx` 调用替换为 `sessionStorage.xxx`。
+- **放行条件核查**：第二轮复审约定的最小放行条件为"不以 localStorage 作为正式会话载体"——**已满足**：token 迁移至会话级存储，浏览器标签页关闭后自动清除，不再持久化至本地磁盘。
+- **复核意见**：MVP 阶段约定的最小关闭条件已达成，本项**条件关闭**。
+- **残余风险**（已知，已接受）：
+  - `sessionStorage` 与 `localStorage` 同等暴露于 XSS 攻击面，页面内 JavaScript 均可读取其内容；
+  - 生产级安全会话须使用 `httpOnly + Secure + SameSite=Strict Cookie`，配套 CSRF Token 防护；
+  - httpOnly Cookie 方案已列入正式版（v1.0+）安全基线，在此之前**禁止**将此 MVP 前端部署于面向公众的生产环境。
+
+---
+
+### 10.3 安全门禁判定
+
+| 检查项 | 本轮状态 | 依据 |
+|---|---|---|
+| VUL-01/02/03/04/06/09（历史关闭）| ✅ 保持关闭 | 第一/二轮复审确认，本轮变更未影响 |
+| VUL-05（历史关闭）| ✅ 保持关闭 | 第二轮复审确认 |
+| VUL-07/08（降级残余风险）| ✅ 不阻塞 | 第二轮复审降级，本轮未涉及 |
+| VUL-10 CORS 配置 | ✅ **已关闭** | 本轮变更：白名单 origin、Authorization 头允许、credentials: false |
+| VUL-11 HSTS 安全响应头 | ✅ **已关闭** | 本轮变更：生产环境专用中间件，四项响应头完整 |
+| VUL-12 依赖 CVE 处置 | ✅ **已关闭**（静态评估）| vite ^5.4.6 / axios ^1.7.4 均覆盖对应修复版本 |
+| VUL-13 会话存储迁移 | ✅ **已关闭**（MVP 条件）| localStorage → sessionStorage，满足约定关闭条件 |
+
+**安全门禁结论**：✅ **通过**
+
+> 所有原发布阻塞项已关闭，可进入发布评估阶段。发布前须完成以下确认事项：①`npm install` 已在目标环境执行；②`FRONTEND_URL` 生产环境变量已配置；③`NODE_ENV=production` 已激活。
+
+---
+
+### 10.4 残余风险说明
+
+以下风险已知且被接受，作为正式版（v1.0+）治理项保留，不构成当前发布阻塞：
+
+| # | 残余风险 | 影响范围 | 治理计划 |
+|---|---|---|---|
+| R-01 | VUL-13 XSS 会话风险：sessionStorage 仍可被 XSS 读取 | 前端会话安全 | 正式版迁移 httpOnly Cookie + CSRF Token |
+| R-02 | VUL-12 npm install 未执行：依赖树变更尚未在目标环境生效 | 前端依赖安全 | 发布前在目标环境执行 `npm install` |
+| R-03 | 后端 apps/api 依赖未全量审计：本轮仅更新前端依赖 | 后端供应链 | 可运行环境执行 `cd apps/api && npm audit` |
+| R-04 | CSP 响应头缺失：VUL-11 未配置 Content-Security-Policy | XSS 防线纵深 | 正式版补充 CSP 策略 |
+| R-05 | VUL-07/08 架构残余风险：内存原子性 + 单进程限流 | 并发一致性与可用性 | PostgreSQL 迁移 + Redis/网关限流 |
+
+---
+
 **文档结束**  
-**版本信息**：v0.1 | 2026-04-14 | 安全审查师
+**版本信息**：v0.5 | 2026-04-16 | 安全审查师

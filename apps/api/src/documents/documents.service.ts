@@ -5,6 +5,7 @@ import { AuditService } from '../audit/audit.service';
 import { ProjectsService } from '../projects/projects.service';
 import { Document } from '../common/interfaces/entities.interface';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { sanitizeFilename } from '../common/utils/file-sanitizer';
 
 @Injectable()
 export class DocumentsService {
@@ -28,8 +29,8 @@ export class DocumentsService {
 
     const documentId = uuidv4();
     const now = new Date();
-    const storageKey =
-      dto.storageKey || `/${projectId}/${documentId}/v1/${dto.name}`;
+    const safeFilename = sanitizeFilename(dto.name);
+    const storageKey = `${projectId}/${documentId}/v1/${safeFilename}`;
 
     const document: Document = {
       id: documentId,
@@ -46,6 +47,7 @@ export class DocumentsService {
     this.store.documents.set(documentId, document);
 
     this.auditService.record({
+      projectId,
       requestId,
       actorId,
       action: 'CREATE_DOCUMENT',

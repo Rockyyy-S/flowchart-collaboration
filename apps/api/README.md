@@ -24,15 +24,31 @@ npm run build && npm run start:prod
 
 ---
 
-## 身份模拟（MVP）
+## 鉴权说明（JWT Bearer）
 
-MVP 阶段未集成 JWT，使用 **请求头 `x-user-id`** 模拟用户身份：
+所有非公开接口均要求：
 
+```text
+Authorization: Bearer <token>
 ```
-x-user-id: user-001
+
+开发环境可通过下述接口签发测试 token：
+
+```bash
+curl -s -X POST http://localhost:3000/api/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user-001"}' | jq '.data'
 ```
 
-所有写操作都会将此值记录到审计日志的 `actorId` 字段。
+返回示例：
+
+```json
+{
+  "accessToken": "<jwt>",
+  "tokenType": "Bearer",
+  "expiresIn": "1h"
+}
+```
 
 ---
 
@@ -40,6 +56,7 @@ x-user-id: user-001
 
 | 方法   | 路径                                              | 说明                       |
 |--------|---------------------------------------------------|----------------------------|
+| POST   | /api/v1/auth/token                                | 签发测试 token（公开）     |
 | POST   | /api/v1/projects                                  | 创建项目                   |
 | GET    | /api/v1/projects/:projectId/flows/current         | 获取当前流程定义           |
 | PUT    | /api/v1/projects/:projectId/flows/draft           | 保存流程草稿（自动建执行） |
@@ -58,9 +75,13 @@ x-user-id: user-001
 ### 1. 创建项目
 
 ```bash
+TOKEN=$(curl -s -X POST http://localhost:3000/api/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user-001"}' | jq -r '.data.accessToken')
+
 curl -s -X POST http://localhost:3000/api/v1/projects \
   -H "Content-Type: application/json" \
-  -H "x-user-id: user-001" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"name": "示例研发项目"}' | jq '.data'
 # 记录返回的 projectId
 ```
@@ -70,7 +91,7 @@ curl -s -X POST http://localhost:3000/api/v1/projects \
 ```bash
 curl -s -X PUT http://localhost:3000/api/v1/projects/{projectId}/flows/draft \
   -H "Content-Type: application/json" \
-  -H "x-user-id: user-001" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "graphJson": {"nodes": [{"id": "node-1", "text": "需求评审"}], "edges": []},
     "nodesConfig": [{
@@ -88,7 +109,7 @@ curl -s -X PUT http://localhost:3000/api/v1/projects/{projectId}/flows/draft \
 
 ```bash
 curl -s http://localhost:3000/api/v1/projects/{projectId}/executions \
-  -H "x-user-id: user-001" | jq '.data'
+  -H "Authorization: Bearer $TOKEN" | jq '.data'
 ```
 
 ### 4. 开始节点执行（READY → IN_PROGRESS）
@@ -96,7 +117,7 @@ curl -s http://localhost:3000/api/v1/projects/{projectId}/executions \
 ```bash
 curl -s -X POST http://localhost:3000/api/v1/executions/{executionId}/start \
   -H "Content-Type: application/json" \
-  -H "x-user-id: user-001" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{}' | jq '.data'
 ```
 
@@ -105,7 +126,7 @@ curl -s -X POST http://localhost:3000/api/v1/executions/{executionId}/start \
 ```bash
 curl -s -X POST http://localhost:3000/api/v1/executions/{executionId}/submit \
   -H "Content-Type: application/json" \
-  -H "x-user-id: user-001" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"comment": "测试门禁失败"}' | jq '.data'
 # 预期：status=NEEDS_FIX, gatePass=false, missingArtifacts=[{requirementId: "req-prd", ...}]
 ```
@@ -116,23 +137,23 @@ curl -s -X POST http://localhost:3000/api/v1/executions/{executionId}/submit \
 # 上传文档
 DOC_ID=$(curl -s -X POST http://localhost:3000/api/v1/projects/{projectId}/documents \
   -H "Content-Type: application/json" \
-  -H "x-user-id: user-001" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"name": "PRD_v1.0.pdf", "mimeType": "application/pdf", "size": 204800}' | jq -r '.data.documentId')
 
 # 重新开始（NEEDS_FIX → IN_PROGRESS）
 curl -s -X POST http://localhost:3000/api/v1/executions/{executionId}/start \
-  -H "Content-Type: application/json" -H "x-user-id: user-001" -d '{}'
+  -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" -d '{}'
 
 # 绑定输出物
 curl -s -X POST http://localhost:3000/api/v1/executions/{executionId}/artifacts/bind \
   -H "Content-Type: application/json" \
-  -H "x-user-id: user-001" \
+  -H "Authorization: Bearer $TOKEN" \
   -d "{\"requirementId\": \"req-prd\", \"documentId\": \"$DOC_ID\"}"
 
 # 再次提交
 curl -s -X POST http://localhost:3000/api/v1/executions/{executionId}/submit \
   -H "Content-Type: application/json" \
-  -H "x-user-id: user-001" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"comment": "文档已补齐"}' | jq '.data'
 # 预期：status=COMPLETED, gatePass=true, missingArtifacts=[]
 ```
@@ -141,7 +162,25 @@ curl -s -X POST http://localhost:3000/api/v1/executions/{executionId}/submit \
 
 ```bash
 curl -s http://localhost:3000/api/v1/executions/{executionId}/gate-result \
-  -H "x-user-id: user-001" | jq '.data'
+  -H "Authorization: Bearer $TOKEN" | jq '.data'
+```
+
+### 7. 401/403 安全验证
+
+```bash
+# 无 token：应返回 401
+curl -i -X POST http://localhost:3000/api/v1/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name":"no-auth"}'
+
+# 跨项目访问：应返回 403
+TOKEN_A=$(curl -s -X POST http://localhost:3000/api/v1/auth/token -H "Content-Type: application/json" -d '{"userId":"user-a"}' | jq -r '.data.accessToken')
+TOKEN_B=$(curl -s -X POST http://localhost:3000/api/v1/auth/token -H "Content-Type: application/json" -d '{"userId":"user-b"}' | jq -r '.data.accessToken')
+
+PROJECT_A=$(curl -s -X POST http://localhost:3000/api/v1/projects -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN_A" -d '{"name":"A项目"}' | jq -r '.data.projectId')
+
+curl -i http://localhost:3000/api/v1/projects/$PROJECT_A/documents \
+  -H "Authorization: Bearer $TOKEN_B"
 ```
 
 ---
@@ -149,6 +188,7 @@ curl -s http://localhost:3000/api/v1/executions/{executionId}/gate-result \
 ## 统一响应格式
 
 **成功：**
+
 ```json
 {
   "data": { ... },
@@ -157,6 +197,7 @@ curl -s http://localhost:3000/api/v1/executions/{executionId}/gate-result \
 ```
 
 **错误：**
+
 ```json
 {
   "code": "INVALID_STATE_TRANSITION",
@@ -170,7 +211,7 @@ curl -s http://localhost:3000/api/v1/executions/{executionId}/gate-result \
 
 ## 模块边界说明
 
-```
+```text
 src/
 ├── common/           公共枚举、接口定义、过滤器、拦截器
 │   ├── enums/        ExecutionStatus 状态机枚举（前后端共享来源）

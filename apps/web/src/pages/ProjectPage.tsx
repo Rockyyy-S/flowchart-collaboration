@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Alert,
@@ -62,7 +62,6 @@ export default function ProjectPage() {
   const {
     data: executions = [],
     isLoading: execLoading,
-    refetch,
   } = useQuery({
     queryKey: ['executions', projectId],
     queryFn: () => getExecutions(projectId!),
@@ -87,13 +86,53 @@ export default function ProjectPage() {
     setDrawerOpen(true);
   }
 
+  useEffect(() => {
+    if (!selectedExecution) {
+      return;
+    }
+
+    const latest = executions.find(
+      (item) => item.executionId === selectedExecution.executionId,
+    );
+
+    if (!latest) {
+      setDrawerOpen(false);
+      setSelectedExecution(null);
+      return;
+    }
+
+    if (latest !== selectedExecution) {
+      setSelectedExecution(latest);
+    }
+  }, [executions, selectedExecution]);
+
   // ─── 统计数据 ───
-  const total = executions.length;
-  const completed = executions.filter((e) => e.status === 'COMPLETED').length;
-  const needsFix = executions.filter((e) => e.status === 'NEEDS_FIX').length;
-  const inProgress = executions.filter(
-    (e) => e.status === 'IN_PROGRESS' || e.status === 'GATE_CHECKING',
-  ).length;
+  const summary = useMemo(() => {
+    let completed = 0;
+    let needsFix = 0;
+    let inProgress = 0;
+
+    executions.forEach((item) => {
+      if (item.status === 'COMPLETED') {
+        completed += 1;
+      }
+      if (item.status === 'NEEDS_FIX') {
+        needsFix += 1;
+      }
+      if (item.status === 'IN_PROGRESS' || item.status === 'GATE_CHECKING') {
+        inProgress += 1;
+      }
+    });
+
+    return {
+      total: executions.length,
+      completed,
+      needsFix,
+      inProgress,
+    };
+  }, [executions]);
+
+  const { total, completed, needsFix, inProgress } = summary;
 
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 

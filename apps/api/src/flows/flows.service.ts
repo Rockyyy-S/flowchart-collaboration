@@ -161,6 +161,7 @@ export class FlowsService {
     }
 
     this.auditService.record({
+      projectId,
       requestId,
       actorId,
       action: 'UPDATE_FLOW_DRAFT',

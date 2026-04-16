@@ -5,10 +5,12 @@ import type { DocumentMeta } from './types';
 export async function createDocument(
   projectId: string,
   payload: { name: string; mimeType: string; size: number },
+  options?: { suppressErrorToast?: boolean },
 ): Promise<DocumentMeta> {
   const res = await apiClient.post<DocumentMeta>(
     `/projects/${projectId}/documents`,
     payload,
+    options,
   );
   return res.data;
 }

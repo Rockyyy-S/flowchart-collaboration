@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { AxiosError } from 'axios';
 import {
   Button,
   Form,
@@ -12,6 +13,7 @@ import {
 import { UploadOutlined, LinkOutlined } from '@ant-design/icons';
 import { createDocument } from '../../api/documents';
 import { bindArtifact } from '../../api/executions';
+import { isPreAuthWriteBlockedError } from '../../api/client';
 import type { ArtifactRequirement, DocumentMeta } from '../../api/types';
 
 const { Text } = Typography;
@@ -28,13 +30,22 @@ interface DocumentUploadModalProps {
   onCancel: () => void;
 }
 
+type ApiErrorLike = {
+  message?: string;
+  details?: unknown[];
+};
+
 const MIME_OPTIONS = [
   { label: 'PDF 文档', value: 'application/pdf' },
   { label: 'Word 文档', value: 'application/msword' },
-  { label: 'Excel 表格', value: 'application/vnd.ms-excel' },
+  {
+    label: 'Word 文档（.docx）',
+    value: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  },
   { label: 'Markdown', value: 'text/markdown' },
+  { label: '纯文本', value: 'text/plain' },
   { label: '图片 (PNG)', value: 'image/png' },
-  { label: '其他', value: 'application/octet-stream' },
+  { label: '图片 (JPEG)', value: 'image/jpeg' },
 ];
 
 /**
@@ -59,6 +70,10 @@ export default function DocumentUploadModal({
   const [useExisting, setUseExisting] = useState(false);
 
   async function handleSubmit() {
+    if (loading) {
+      return;
+    }
+
     try {
       const values = await form.validateFields();
       setLoading(true);
@@ -74,18 +89,49 @@ export default function DocumentUploadModal({
           name: values.name,
           mimeType: values.mimeType,
           size: values.size ? Number(values.size) * 1024 : 102400,
-        });
+        }, { suppressErrorToast: true });
         documentId = doc.documentId;
       }
 
       // 绑定到选定的输出物
-      await bindArtifact(executionId, values.requirementId, documentId);
+      await bindArtifact(
+        executionId,
+        values.requirementId,
+        documentId,
+        { suppressErrorToast: true },
+      );
 
       message.success('文档已上传并绑定成功');
       form.resetFields();
       onSuccess();
-    } catch {
-      // 错误由 apiClient 拦截器统一 toast
+    } catch (error) {
+      const formError =
+        typeof error === 'object' &&
+        error !== null &&
+        'errorFields' in error;
+
+      if (!formError) {
+        if (isPreAuthWriteBlockedError(error)) {
+          return;
+        }
+
+        const axiosError = error as AxiosError<ApiErrorLike>;
+        const detailText = Array.isArray(axiosError.response?.data?.details)
+          ? axiosError.response?.data?.details
+              ?.map((item) => String(item))
+              .join('；')
+          : '';
+        const reason =
+          axiosError.response?.data?.message ||
+          axiosError.message ||
+          '网络异常或服务不可用';
+
+        message.error(
+          detailText
+            ? `上传/绑定失败：${reason}（${detailText}）`
+            : `上传/绑定失败：${reason}`,
+        );
+      }
     } finally {
       setLoading(false);
     }

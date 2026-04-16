@@ -11,6 +11,7 @@ import { GateEngineService } from './gate-engine.service';
 import {
   NodeExecution,
   ArtifactBinding,
+  GateResult,
 } from '../common/interfaces/entities.interface';
 import { ExecutionStatus } from '../common/enums/execution-status.enum';
 import { StartExecutionDto } from './dto/start-execution.dto';
@@ -111,6 +112,7 @@ export class ExecutionsService {
     this.store.nodeExecutions.set(executionId, execution);
 
     this.auditService.record({
+      projectId: execution.projectId,
       requestId,
       actorId,
       action: 'START_EXECUTION',
@@ -126,9 +128,6 @@ export class ExecutionsService {
    * 提交节点完成并触发门禁校验（原子操作）
    * 来源状态：IN_PROGRESS
    * 门禁通过 → COMPLETED；门禁失败 → NEEDS_FIX
-   *
-   * 注意：此操作内的状态流转（IN_PROGRESS → GATE_CHECKING → COMPLETED/NEEDS_FIX）
-   * 在正式版本需放入同一 DB 事务（含 outbox 事件写入）
    */
   submit(
     executionId: string,
@@ -146,62 +145,90 @@ export class ExecutionsService {
     }
 
     const now = new Date();
+    const executionBeforeCommit = this.cloneExecution(execution);
+    const projectExecutions = [...this.store.nodeExecutions.values()]
+      .filter((item) => item.projectId === execution.projectId)
+      .map((item) => this.cloneExecution(item));
 
-    // 1. 标记为门禁检查中（系统独占写入，前端不得直接写此状态）
-    execution.status = ExecutionStatus.GATE_CHECKING;
-    execution.updatedAt = now;
-    this.store.nodeExecutions.set(executionId, execution);
+    const stagedExecution = this.cloneExecution(execution);
+    stagedExecution.status = ExecutionStatus.GATE_CHECKING;
+    stagedExecution.updatedAt = now;
 
-    // 2. 执行门禁校验
-    const gateResult = this.gateEngine.check(execution);
-    execution.gateResult = gateResult;
+    const gateResult = this.gateEngine.check(stagedExecution);
+    stagedExecution.gateResult = gateResult;
 
-    // 3. 根据门禁结果落最终状态
+    const successorUpdates = gateResult.pass
+      ? this.planSuccessorUnlocks(projectExecutions, stagedExecution, now)
+      : [];
+
     if (gateResult.pass) {
-      execution.status = ExecutionStatus.COMPLETED;
-      execution.completedAt = now;
-      // 自动解锁后继节点
-      this.unlockSuccessors(execution);
-      this.notificationsService.publishEvent({
-        eventType: 'NODE_COMPLETED',
-        receivers: [actorId],
-        payload: {
-          executionId,
-          nodeId: execution.nodeId,
-          projectId: execution.projectId,
-        },
-      });
+      stagedExecution.status = ExecutionStatus.COMPLETED;
+      stagedExecution.completedAt = now;
     } else {
-      execution.status = ExecutionStatus.NEEDS_FIX;
-      this.notificationsService.publishEvent({
-        eventType: 'GATE_CHECK_FAILED',
-        receivers: [actorId],
+      stagedExecution.status = ExecutionStatus.NEEDS_FIX;
+    }
+    stagedExecution.updatedAt = now;
+
+    const notificationEvent = gateResult.pass
+      ? {
+          eventType: 'NODE_COMPLETED',
+          receivers: [actorId],
+          payload: {
+            executionId,
+            nodeId: stagedExecution.nodeId,
+            projectId: stagedExecution.projectId,
+          },
+        }
+      : {
+          eventType: 'GATE_CHECK_FAILED',
+          receivers: [actorId],
+          payload: {
+            executionId,
+            nodeId: stagedExecution.nodeId,
+            missingArtifacts: gateResult.missingArtifacts,
+          },
+        };
+
+    const successorSnapshots = successorUpdates
+      .map((item) => this.store.nodeExecutions.get(item.id))
+      .filter((item): item is NodeExecution => !!item)
+      .map((item) => this.cloneExecution(item));
+    const auditLogCount = this.store.auditLogs.length;
+    const notificationTaskCount = this.store.notificationTasks.length;
+
+    try {
+      this.store.nodeExecutions.set(executionId, stagedExecution);
+      for (const successor of successorUpdates) {
+        this.store.nodeExecutions.set(successor.id, successor);
+      }
+
+      this.notificationsService.publishEvent(notificationEvent);
+
+      this.auditService.record({
+        projectId: stagedExecution.projectId,
+        requestId,
+        actorId,
+        action: 'SUBMIT_EXECUTION',
+        resourceType: 'NodeExecution',
+        resourceId: executionId,
         payload: {
-          executionId,
-          nodeId: execution.nodeId,
-          missingArtifacts: gateResult.missingArtifacts,
+          nodeId: stagedExecution.nodeId,
+          gatePass: gateResult.pass,
+          missingCount: gateResult.missingArtifacts.length,
+          comment: dto.comment,
         },
       });
+    } catch (error) {
+      this.store.nodeExecutions.set(executionId, executionBeforeCommit);
+      for (const snapshot of successorSnapshots) {
+        this.store.nodeExecutions.set(snapshot.id, snapshot);
+      }
+      this.store.notificationTasks.splice(notificationTaskCount);
+      this.store.auditLogs.splice(auditLogCount);
+      throw error;
     }
 
-    execution.updatedAt = new Date();
-    this.store.nodeExecutions.set(executionId, execution);
-
-    this.auditService.record({
-      requestId,
-      actorId,
-      action: 'SUBMIT_EXECUTION',
-      resourceType: 'NodeExecution',
-      resourceId: executionId,
-      payload: {
-        nodeId: execution.nodeId,
-        gatePass: gateResult.pass,
-        missingCount: gateResult.missingArtifacts.length,
-        comment: dto.comment,
-      },
-    });
-
-    return execution;
+    return stagedExecution;
   }
 
   /** 查询门禁结果（需已进入 GATE_CHECKING / COMPLETED / NEEDS_FIX 状态） */
@@ -284,6 +311,7 @@ export class ExecutionsService {
     this.store.artifactBindings.set(binding.id, binding);
 
     this.auditService.record({
+      projectId: execution.projectId,
       requestId,
       actorId,
       action: existing ? 'UPDATE_ARTIFACT_BINDING' : 'CREATE_ARTIFACT_BINDING',
@@ -305,33 +333,48 @@ export class ExecutionsService {
    * 节点完成后自动解锁后继节点（PENDING → READY）
    * 检查 predecessorNodeIds 是否全部 COMPLETED
    */
-  private unlockSuccessors(completedExecution: NodeExecution): void {
-    const projectExecutions = [...this.store.nodeExecutions.values()].filter(
-      (e) => e.projectId === completedExecution.projectId,
+  private planSuccessorUnlocks(
+    projectExecutions: NodeExecution[],
+    gateCheckingExecution: NodeExecution,
+    now: Date,
+  ): NodeExecution[] {
+    const executionByNodeId = new Map(
+      projectExecutions.map((item) => [item.nodeId, this.cloneExecution(item)]),
     );
 
-    // 找到以 completedExecution.nodeId 为前置的所有执行实例
-    const candidates = projectExecutions.filter((e) =>
-      e.predecessorNodeIds.includes(completedExecution.nodeId),
+    const completedExecution = this.cloneExecution(gateCheckingExecution);
+    completedExecution.status = ExecutionStatus.COMPLETED;
+    completedExecution.completedAt = now;
+    completedExecution.updatedAt = now;
+    executionByNodeId.set(completedExecution.nodeId, completedExecution);
+
+    const updates: NodeExecution[] = [];
+    const candidates = [...executionByNodeId.values()].filter((item) =>
+      item.predecessorNodeIds.includes(completedExecution.nodeId),
     );
 
     for (const candidate of candidates) {
-      if (candidate.status !== ExecutionStatus.PENDING) continue;
+      if (candidate.status !== ExecutionStatus.PENDING) {
+        continue;
+      }
 
       const allPredecessorsCompleted = candidate.predecessorNodeIds.every(
         (predNodeId) =>
-          projectExecutions.some(
-            (e) =>
-              e.nodeId === predNodeId && e.status === ExecutionStatus.COMPLETED,
-          ),
+          executionByNodeId.get(predNodeId)?.status === ExecutionStatus.COMPLETED,
       );
 
-      if (allPredecessorsCompleted) {
-        candidate.status = ExecutionStatus.READY;
-        candidate.updatedAt = new Date();
-        this.store.nodeExecutions.set(candidate.id, candidate);
+      if (!allPredecessorsCompleted) {
+        continue;
       }
+
+      const unlockedExecution = this.cloneExecution(candidate);
+      unlockedExecution.status = ExecutionStatus.READY;
+      unlockedExecution.updatedAt = now;
+      executionByNodeId.set(unlockedExecution.nodeId, unlockedExecution);
+      updates.push(unlockedExecution);
     }
+
+    return updates;
   }
 
   /**
@@ -374,5 +417,31 @@ export class ExecutionsService {
         this.store.nodeExecutions.set(execution.id, execution);
       }
     }
+  }
+
+  private cloneExecution(execution: NodeExecution): NodeExecution {
+    return {
+      ...execution,
+      assignees: [...execution.assignees],
+      predecessorNodeIds: [...execution.predecessorNodeIds],
+      dueAt: execution.dueAt ? new Date(execution.dueAt) : undefined,
+      startedAt: execution.startedAt ? new Date(execution.startedAt) : undefined,
+      completedAt: execution.completedAt
+        ? new Date(execution.completedAt)
+        : undefined,
+      gateResult: execution.gateResult
+        ? this.cloneGateResult(execution.gateResult)
+        : undefined,
+      createdAt: new Date(execution.createdAt),
+      updatedAt: new Date(execution.updatedAt),
+    };
+  }
+
+  private cloneGateResult(gateResult: GateResult): GateResult {
+    return {
+      ...gateResult,
+      checkedAt: new Date(gateResult.checkedAt),
+      missingArtifacts: gateResult.missingArtifacts.map((item) => ({ ...item })),
+    };
   }
 }

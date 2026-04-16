@@ -1,9 +1,10 @@
-import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, MaxLength, IsUrl } from 'class-validator';
 
 export class BindArtifactDto {
   /** 对应 NodeConfig.requiredArtifacts[].id，必须稳定可追溯 */
   @IsString()
   @IsNotEmpty()
+  @MaxLength(80)
   requirementId: string;
 
   /**
@@ -12,6 +13,7 @@ export class BindArtifactDto {
    */
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   documentId?: string;
 
   /**
@@ -19,6 +21,13 @@ export class BindArtifactDto {
    * 仅供参考记录，架构约束：外链不计入门禁通过条件
    */
   @IsOptional()
-  @IsString()
+  @IsUrl(
+    {
+      protocols: ['http', 'https'],
+      require_protocol: true,
+    },
+    { message: 'externalUrl 必须为合法 http/https URL' },
+  )
+  @MaxLength(500)
   externalUrl?: string;
 }

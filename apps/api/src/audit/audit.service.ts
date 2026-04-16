@@ -4,12 +4,18 @@ import { StoreService } from '../shared/store.service';
 import { AuditLog } from '../common/interfaces/entities.interface';
 
 export interface RecordAuditParams {
+  projectId: string;
   requestId: string;
   actorId: string;
   action: string;
   resourceType: string;
   resourceId: string;
   payload?: Record<string, unknown>;
+}
+
+export interface AuditLogQuery {
+  resourceType?: string;
+  resourceId?: string;
 }
 
 /**
@@ -26,6 +32,7 @@ export class AuditService {
   record(params: RecordAuditParams): AuditLog {
     const log: AuditLog = {
       id: uuidv4(),
+      projectId: params.projectId,
       requestId: params.requestId,
       actorId: params.actorId,
       action: params.action,
@@ -45,7 +52,29 @@ export class AuditService {
     );
   }
 
+  findByProject(projectId: string, query: AuditLogQuery = {}): AuditLog[] {
+    return this.store.auditLogs
+      .filter((log) => {
+        if (log.projectId !== projectId) {
+          return false;
+        }
+
+        if (query.resourceType && log.resourceType !== query.resourceType) {
+          return false;
+        }
+
+        if (query.resourceId && log.resourceId !== query.resourceId) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
   findAll(): AuditLog[] {
-    return [...this.store.auditLogs];
+    return [...this.store.auditLogs].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
   }
 }

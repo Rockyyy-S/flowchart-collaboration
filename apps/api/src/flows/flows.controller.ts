@@ -7,13 +7,16 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { FlowsService } from './flows.service';
 import { UpdateFlowDraftDto } from './dto/update-flow-draft.dto';
+import { ProjectAccessGuard } from '../common/guards/project-access.guard';
+import { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 
 /** 流程定义管理接口（嵌套在项目路由下） */
 @Controller('projects')
+@UseGuards(ProjectAccessGuard)
 export class FlowsController {
   constructor(private readonly flowsService: FlowsService) {}
 
@@ -44,10 +47,10 @@ export class FlowsController {
   updateDraft(
     @Param('projectId') projectId: string,
     @Body() dto: UpdateFlowDraftDto,
-    @Req() req: Request,
+    @Req() req: AuthenticatedRequest,
   ) {
-    const actorId = (req.headers['x-user-id'] as string) || 'anonymous';
-    const requestId = (req as any).requestId || 'unknown';
+    const actorId = req.user?.userId as string;
+    const requestId = req.requestId || 'unknown';
     const flow = this.flowsService.updateDraft(projectId, dto, actorId, requestId);
     return {
       flowDefinitionId: flow.id,

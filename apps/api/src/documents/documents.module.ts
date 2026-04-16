@@ -3,10 +3,11 @@ import { DocumentsService } from './documents.service';
 import { DocumentsController } from './documents.controller';
 import { AuditModule } from '../audit/audit.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { ProjectAccessGuard } from '../common/guards/project-access.guard';
 
 @Module({
   imports: [AuditModule, ProjectsModule],
-  providers: [DocumentsService],
+  providers: [DocumentsService, ProjectAccessGuard],
   controllers: [DocumentsController],
   exports: [DocumentsService],
 })

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Typography } from 'antd';
 import { RightOutlined } from '@ant-design/icons';
 import type { FlowDefinition, NodeExecution } from '../../api/types';
@@ -70,17 +71,23 @@ export default function FlowCanvas({
   const edges = graphJson.edges ?? [];
 
   // 按边关系做拓扑排序
-  const sortedNodeIds = topoSort(
-    nodes.map((n) => n.id),
-    edges,
+  const sortedNodeIds = useMemo(
+    () => topoSort(nodes.map((n) => n.id), edges),
+    [nodes, edges],
   );
 
   // 构建 nodeId → execution 映射
-  const execMap = new Map<string, NodeExecution>();
-  executions.forEach((e) => execMap.set(e.nodeId, e));
+  const execMap = useMemo(() => {
+    const map = new Map<string, NodeExecution>();
+    executions.forEach((e) => map.set(e.nodeId, e));
+    return map;
+  }, [executions]);
 
   // 构建 nodeId → nodeConfig 映射
-  const configMap = new Map(nodesConfig.map((nc) => [nc.nodeId, nc]));
+  const configMap = useMemo(
+    () => new Map(nodesConfig.map((nc) => [nc.nodeId, nc])),
+    [nodesConfig],
+  );
 
   if (sortedNodeIds.length === 0) {
     return (

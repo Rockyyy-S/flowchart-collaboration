@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -22,6 +23,7 @@ import {
 import dayjs from 'dayjs';
 import { createProject } from '../api/projects';
 import { updateFlowDraft } from '../api/flows';
+import { getAccessToken, subscribeTokenChange } from '../auth/token';
 import type { ProjectSummary } from '../api/types';
 
 const { Title, Text, Paragraph } = Typography;
@@ -118,11 +120,19 @@ export default function WorkbenchPage() {
   const [demoLoading, setDemoLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
   const [form] = Form.useForm<{ name: string }>();
+  const [hasToken, setHasToken] = useState(() => !!getAccessToken());
+  const creating = demoLoading || formLoading;
 
   // 当 projects 变化时同步到 localStorage
   useEffect(() => {
     saveProjects(projects);
   }, [projects]);
+
+  useEffect(() => {
+    return subscribeTokenChange(() => {
+      setHasToken(!!getAccessToken());
+    });
+  }, []);
 
   /** 将新项目追加到列表并跳转 */
   function addAndNavigate(summary: ProjectSummary) {
@@ -132,6 +142,10 @@ export default function WorkbenchPage() {
 
   /** 创建演示项目（含预设研发流程） */
   async function handleCreateDemo() {
+    if (creating) {
+      return;
+    }
+
     setDemoLoading(true);
     try {
       const project = await createProject('示例研发项目');
@@ -151,6 +165,10 @@ export default function WorkbenchPage() {
 
   /** 创建自定义空白项目 */
   async function handleCreateBlank() {
+    if (creating) {
+      return;
+    }
+
     try {
       const values = await form.validateFields();
       setFormLoading(true);
@@ -188,6 +206,15 @@ export default function WorkbenchPage() {
   return (
     <div>
       {/* 页面标题 */}
+      {!hasToken && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16, borderRadius: 8 }}
+          message="当前未登录，写操作会被拦截"
+          description="请先在右上角点击“获取开发令牌”，再创建项目或提交流程。"
+        />
+      )}
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <Title level={4} style={{ margin: 0 }}>
@@ -202,12 +229,14 @@ export default function WorkbenchPage() {
             icon={<RocketOutlined />}
             onClick={handleCreateDemo}
             loading={demoLoading}
+            disabled={creating}
           >
             快速体验演示项目
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
+            disabled={creating}
             onClick={() => setCreateModalOpen(true)}
           >
             新建项目
@@ -241,6 +270,7 @@ export default function WorkbenchPage() {
               size="large"
               icon={<RocketOutlined />}
               loading={demoLoading}
+              disabled={creating}
               onClick={handleCreateDemo}
             >
               一键体验
@@ -301,6 +331,8 @@ export default function WorkbenchPage() {
         okText="创建"
         cancelText="取消"
         confirmLoading={formLoading}
+        okButtonProps={{ disabled: creating }}
+        cancelButtonProps={{ disabled: creating }}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
