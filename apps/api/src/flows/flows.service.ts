@@ -96,6 +96,12 @@ export class FlowsService {
           sourceType: ar.sourceType || 'DOCUMENT',
         }),
       ),
+      // 同步节点扩展配置字段
+      ...(nc.assignees ? { assignees: nc.assignees } : {}),
+      ...(nc.dueDate ? { dueDate: new Date(nc.dueDate) } : {}),
+      ...(nc.description ? { description: nc.description } : {}),
+      ...(nc.priority ? { priority: nc.priority } : {}),
+      ...(nc.estimatedHours !== undefined ? { estimatedHours: nc.estimatedHours } : {}),
     }));
 
     draft.graphJson = dto.graphJson;
@@ -113,6 +119,9 @@ export class FlowsService {
       const predecessorNodeIds = nc.predecessorNodeIds || [];
       const existing = executionByNodeId.get(nc.nodeId);
 
+      // 从节点静态配置中取出对应的 NodeConfig，用于同步 assignees / dueDate
+      const cfg = nodesConfig.find((c) => c.nodeId === nc.nodeId);
+
       if (!existing) {
         const execution: NodeExecution = {
           id: uuidv4(),
@@ -126,7 +135,10 @@ export class FlowsService {
             predecessorNodeIds.length === 0
               ? ExecutionStatus.READY
               : ExecutionStatus.PENDING,
-          assignees: [],
+          // 从 NodeConfig 同步执行人；无配置时默认空数组
+          assignees: cfg?.assignees?.length ? [...cfg.assignees] : [],
+          // 从 NodeConfig 同步截止时间
+          ...(cfg?.dueDate ? { dueAt: cfg.dueDate } : {}),
           predecessorNodeIds,
           createdAt: now,
           updatedAt: now,
@@ -140,6 +152,15 @@ export class FlowsService {
       existing.nodeName = nc.name;
       existing.predecessorNodeIds = predecessorNodeIds;
       existing.updatedAt = now;
+
+      // 仅当 execution 中 assignees 还是默认空值时，从 NodeConfig 同步
+      if (existing.assignees.length === 0 && cfg?.assignees?.length) {
+        existing.assignees = [...cfg.assignees];
+      }
+      // 仅当 execution 中 dueAt 未设置时，从 NodeConfig 同步
+      if (!existing.dueAt && cfg?.dueDate) {
+        existing.dueAt = cfg.dueDate;
+      }
 
       // 仅对可逆的等待态进行自愈；不覆盖进行中/已完成等运行态
       if (

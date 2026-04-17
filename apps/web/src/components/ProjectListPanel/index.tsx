@@ -14,18 +14,23 @@ import {
   message,
 } from 'antd';
 import {
+  CrownOutlined,
   DoubleLeftOutlined,
   DoubleRightOutlined,
+  FolderOpenOutlined,
   FolderOutlined,
+  InboxOutlined,
   PlusOutlined,
   RocketOutlined,
+  TeamOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getMyProjects } from '../../api/projects';
 import { createProject } from '../../api/projects';
 import { updateFlowDraft } from '../../api/flows';
 import { getAccessToken } from '../../auth/token';
-import type { ProjectListItem, ProjectSummary } from '../../api/types';
+import type { ProjectListItem } from '../../api/types';
 
 const { Text } = Typography;
 
@@ -36,11 +41,11 @@ const STORAGE_KEY = 'flowkit_projects';
 const DEMO_FLOW = {
   graphJson: {
     nodes: [
-      { id: 'node-req', text: '需求评审' },
+      { id: 'node-req', text: '需求评审', type: 'START' as const },
       { id: 'node-tech', text: '技术方案评审' },
       { id: 'node-dev', text: '开发' },
       { id: 'node-qa', text: '测试验收' },
-      { id: 'node-deploy', text: '发布上线' },
+      { id: 'node-deploy', text: '发布上线', type: 'END' as const },
     ],
     edges: [
       { source: 'node-req', target: 'node-tech' },
@@ -53,6 +58,7 @@ const DEMO_FLOW = {
     {
       nodeId: 'node-req',
       name: '需求评审',
+      type: 'START',
       requiredArtifacts: [
         { id: 'art-prd', name: '产品需求文档(PRD)', required: true },
       ],
@@ -85,6 +91,7 @@ const DEMO_FLOW = {
     {
       nodeId: 'node-deploy',
       name: '发布上线',
+      type: 'END',
       requiredArtifacts: [
         { id: 'art-release-checklist', name: '发布清单', required: false },
       ],
@@ -92,16 +99,6 @@ const DEMO_FLOW = {
     },
   ],
 };
-
-/** 从 localStorage 读取项目列表（降级兜底） */
-function loadLocalProjects(): ProjectSummary[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as ProjectSummary[]) : [];
-  } catch {
-    return [];
-  }
-}
 
 /** 持久化项目列表到 localStorage */
 function saveLocalProjects(projects: ProjectSummary[]) {
@@ -128,18 +125,26 @@ function classifyByProgress(items: ProjectListItem[]) {
   return { notStarted, inProgress, completed };
 }
 
-/** 进度文字描述 */
+/** 进度文字描述 + 进度颜色 */
 function progressText(item: ProjectListItem): string {
   const { totalNodes, completedNodes } = item.progress;
   if (totalNodes === 0) return '暂无节点';
   return `${completedNodes}/${totalNodes} 已完成`;
 }
 
+/** 进度状态颜色 */
+function progressColor(item: ProjectListItem): string {
+  const { totalNodes, completedNodes, inProgressNodes } = item.progress;
+  if (totalNodes > 0 && completedNodes === totalNodes) return 'var(--color-success)';
+  if (inProgressNodes > 0) return 'var(--color-warning)';
+  return 'var(--color-text-muted)';
+}
+
 interface ProjectListPanelProps {
   /** 当前选中的项目 ID */
   selectedProjectId: string | null;
   /** 选中项目回调 */
-  onSelectProject: (projectId: string, role: 'OWNER' | 'MEMBER' | 'VIEWER') => void;
+  onSelectProject: (projectId: string, role: 'OWNER' | 'MEMBER' | 'VIEWER', initialMode?: 'view' | 'edit') => void;
   /** 面板是否折叠 */
   collapsed: boolean;
   /** 切换折叠 */
@@ -149,7 +154,7 @@ interface ProjectListPanelProps {
 /**
  * 左侧项目列表面板
  *
- * 按"我负责的 / 我参与的"分大类，再按"未开始 / 进行中 / 已完成"分子类。
+ * 按"我负责的 / 我参与的"分大类，再按"未开始项目 / 未完成项目 / 已完成项目"分子类。
  * 已登录时调 GET /api/v1/projects；未登录时降级读 localStorage。
  */
 export default function ProjectListPanel({
@@ -173,21 +178,13 @@ export default function ProjectListPanel({
   });
 
   /* 按角色和进度分类 */
-  const { owned, participated, localFallback } = useMemo(() => {
-    if (remoteProjects && remoteProjects.length > 0) {
-      const ownedList = remoteProjects.filter((p) => p.role === 'OWNER');
-      const participatedList = remoteProjects.filter((p) => p.role !== 'OWNER');
-      return {
-        owned: classifyByProgress(ownedList),
-        participated: classifyByProgress(participatedList),
-        localFallback: null,
-      };
-    }
-    /* 未登录或无远端数据时降级读 localStorage */
+  const { owned, participated } = useMemo(() => {
+    const projects = remoteProjects ?? [];
+    const ownedList = projects.filter((p) => p.role === 'OWNER');
+    const participatedList = projects.filter((p) => p.role !== 'OWNER');
     return {
-      owned: null,
-      participated: null,
-      localFallback: loadLocalProjects(),
+      owned: classifyByProgress(ownedList),
+      participated: classifyByProgress(participatedList),
     };
   }, [remoteProjects]);
 
@@ -200,13 +197,11 @@ export default function ProjectListPanel({
       await updateFlowDraft(project.projectId, DEMO_FLOW);
       message.success('演示项目已创建');
       /* 更新 localStorage 兜底 */
-      const local = loadLocalProjects();
       saveLocalProjects([
         { projectId: project.projectId, name: project.name, createdAt: project.createdAt },
-        ...local,
       ]);
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      onSelectProject(project.projectId, 'OWNER');
+      onSelectProject(project.projectId, 'OWNER', 'edit');
     } catch {
       /* 错误由拦截器处理 */
     } finally {
@@ -224,26 +219,25 @@ export default function ProjectListPanel({
       /* 初始化单节点草稿 */
       await updateFlowDraft(project.projectId, {
         graphJson: {
-          nodes: [{ id: 'node-start', text: '起始节点' }],
+          nodes: [{ id: 'node-start', text: '起始节点', type: 'START' as const }],
           edges: [],
         },
         nodesConfig: [
           {
             nodeId: 'node-start',
             name: '起始节点',
+            type: 'START',
             requiredArtifacts: [],
             predecessorNodeIds: [],
           },
         ],
       });
       message.success('项目已创建');
-      const local = loadLocalProjects();
       saveLocalProjects([
         { projectId: project.projectId, name: project.name, createdAt: project.createdAt },
-        ...local,
       ]);
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      onSelectProject(project.projectId, 'OWNER');
+      onSelectProject(project.projectId, 'OWNER', 'edit');
       setCreateModalOpen(false);
       form.resetFields();
     } catch {
@@ -253,7 +247,7 @@ export default function ProjectListPanel({
     }
   }
 
-  /** 渲染单个项目条目 */
+  /** 渲染单个项目条目 —— 增强悬停效果 */
   function renderProjectItem(item: ProjectListItem) {
     const isSelected = selectedProjectId === item.projectId;
     return (
@@ -264,16 +258,19 @@ export default function ProjectListPanel({
         role="button"
         tabIndex={0}
       >
-        <FolderOutlined style={{ flexShrink: 0, color: isSelected ? '#1677ff' : '#8c8c8c' }} />
+        {isSelected
+          ? <FolderOpenOutlined style={{ flexShrink: 0, color: 'var(--color-primary)', fontSize: 15 }} />
+          : <FolderOutlined style={{ flexShrink: 0, color: 'var(--color-text-muted)', fontSize: 15 }} />
+        }
         <div style={{ flex: 1, minWidth: 0 }}>
           <Text
             ellipsis={{ tooltip: item.name }}
             strong={isSelected}
-            style={{ fontSize: 13, display: 'block', lineHeight: '20px' }}
+            style={{ fontSize: 13, display: 'block', lineHeight: '20px', color: isSelected ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
           >
             {item.name}
           </Text>
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          <Text style={{ fontSize: 11, color: progressColor(item) }}>
             {progressText(item)}
           </Text>
         </div>
@@ -281,44 +278,65 @@ export default function ProjectListPanel({
     );
   }
 
-  /** 渲染子分类折叠项 */
+  /** 渲染子分类折叠项 —— 带图标和计数标签 */
   function renderSubCategory(
     label: string,
     items: ProjectListItem[],
     key: string,
   ) {
-    if (items.length === 0) return null;
+    /* 子分类对应图标 */
+    const iconMap: Record<string, React.ReactNode> = {
+      '未开始项目': <InboxOutlined style={{ color: 'var(--color-text-muted)', fontSize: 12 }} />,
+      '未完成项目': <ThunderboltOutlined style={{ color: 'var(--color-warning)', fontSize: 12 }} />,
+      '已完成项目': <FolderOpenOutlined style={{ color: 'var(--color-success)', fontSize: 12 }} />,
+    };
     return {
       key,
       label: (
         <Space size={4}>
-          <Text style={{ fontSize: 12 }}>{label}</Text>
-          <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px' }}>{items.length}</Tag>
+          {iconMap[label]}
+          <Text style={{ fontSize: 12, fontWeight: 500 }}>{label}</Text>
+          <Tag
+            style={{
+              fontSize: 10,
+              lineHeight: '16px',
+              padding: '0 5px',
+              borderRadius: 8,
+              fontWeight: 600,
+            }}
+          >
+            {items.length}
+          </Tag>
         </Space>
       ),
-      children: <div>{items.map(renderProjectItem)}</div>,
+      children: items.length > 0
+        ? <div>{items.map(renderProjectItem)}</div>
+        : <Text style={{ fontSize: 12, color: 'var(--color-text-muted)', padding: '4px 12px', display: 'block' }}>暂无项目</Text>,
     };
   }
 
-  /** 渲染已分类的大类 */
+  /** 渲染已分类的大类 —— 带角色图标 */
   function renderCategory(
     title: string,
     classified: ReturnType<typeof classifyByProgress>,
     keyPrefix: string,
   ) {
     const subItems = [
-      renderSubCategory('进行中', classified.inProgress, `${keyPrefix}-progress`),
-      renderSubCategory('未开始', classified.notStarted, `${keyPrefix}-notstarted`),
-      renderSubCategory('已完成', classified.completed, `${keyPrefix}-completed`),
-    ].filter(Boolean) as Array<{ key: string; label: React.ReactNode; children: React.ReactNode }>;
+      renderSubCategory('未开始项目', classified.notStarted, `${keyPrefix}-notstarted`),
+      renderSubCategory('未完成项目', classified.inProgress, `${keyPrefix}-progress`),
+      renderSubCategory('已完成项目', classified.completed, `${keyPrefix}-completed`),
+    ];
 
-    if (subItems.length === 0) return null;
+    const icon = keyPrefix === 'owned'
+      ? <CrownOutlined style={{ fontSize: 12, color: 'var(--color-warning)' }} />
+      : <TeamOutlined style={{ fontSize: 12, color: 'var(--color-info)' }} />;
 
     return (
       <div style={{ marginBottom: 8 }}>
-        <Text type="secondary" style={{ fontSize: 11, padding: '4px 12px', display: 'block' }}>
-          {title}
-        </Text>
+        <div className="project-category-title">
+          {icon}
+          <span>{title}</span>
+        </div>
         <Collapse
           ghost
           size="small"
@@ -349,13 +367,14 @@ export default function ProjectListPanel({
     <div className="project-list-panel">
       {/* 顶部操作栏 */}
       <div className="project-list-panel__header">
-        <Space size={4} style={{ flex: 1 }}>
+        <Space size={6} style={{ flex: 1 }}>
           <Button
             size="small"
             type="primary"
             icon={<PlusOutlined />}
             disabled={creating}
             onClick={() => setCreateModalOpen(true)}
+            style={{ borderRadius: 'var(--radius-sm)', fontWeight: 500 }}
           >
             新建
           </Button>
@@ -364,6 +383,7 @@ export default function ProjectListPanel({
             icon={<RocketOutlined />}
             loading={creating}
             onClick={handleCreateDemo}
+            style={{ borderRadius: 'var(--radius-sm)' }}
           >
             快速体验
           </Button>
@@ -382,55 +402,11 @@ export default function ProjectListPanel({
           <div style={{ textAlign: 'center', padding: 24 }}>
             <Spin size="small" />
           </div>
-        ) : owned && participated ? (
+        ) : (
           <>
             {renderCategory('我负责的项目', owned, 'owned')}
             {renderCategory('我参与的项目', participated, 'participated')}
-            {owned.notStarted.length === 0 &&
-              owned.inProgress.length === 0 &&
-              owned.completed.length === 0 &&
-              participated.notStarted.length === 0 &&
-              participated.inProgress.length === 0 &&
-              participated.completed.length === 0 && (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="暂无项目"
-                  style={{ padding: '24px 0' }}
-                />
-              )}
           </>
-        ) : localFallback && localFallback.length > 0 ? (
-          /* 降级：未登录时显示 localStorage 中的项目 */
-          <div>
-            <Text type="secondary" style={{ fontSize: 11, padding: '4px 12px', display: 'block' }}>
-              本地缓存项目
-            </Text>
-            {localFallback.map((p) => (
-              <div
-                key={p.projectId}
-                className={`project-list-item ${selectedProjectId === p.projectId ? 'project-list-item--active' : ''}`}
-                onClick={() => onSelectProject(p.projectId, 'OWNER')}
-                role="button"
-                tabIndex={0}
-              >
-                <FolderOutlined style={{ flexShrink: 0, color: '#8c8c8c' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <Text
-                    ellipsis={{ tooltip: p.name }}
-                    style={{ fontSize: 13, display: 'block' }}
-                  >
-                    {p.name}
-                  </Text>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Empty
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="暂无项目，请新建或快速体验"
-            style={{ padding: '24px 0' }}
-          />
         )}
       </div>
 

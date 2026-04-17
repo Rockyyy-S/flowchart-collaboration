@@ -61,7 +61,22 @@ export interface NodeConfig {
   name: string;
   requiredArtifacts: ArtifactRequirement[];
   predecessorNodeIds?: string[];
+  /** 执行人列表（用户 ID） */
+  assignees?: string[];
+  /** 截止时间（ISO 8601 字符串） */
+  dueDate?: string;
+  /** 节点描述 */
+  description?: string;
+  /** 优先级 */
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  /** 预估工时（小时） */
+  estimatedHours?: number;
+  /** 节点类型（START / END / TASK），默认 'TASK' */
+  type?: NodeType;
 }
+
+/** 节点类型枚举：起始 / 终止 / 普通任务 */
+export type NodeType = 'START' | 'END' | 'TASK';
 
 /** 流程图节点定义（graphJson 中） */
 export interface GraphNode {
@@ -69,6 +84,8 @@ export interface GraphNode {
   text: string;
   x?: number;
   y?: number;
+  /** 节点类型，默认 'TASK' */
+  type?: NodeType;
 }
 
 /** 流程图边定义（graphJson 中） */
@@ -178,5 +195,17 @@ export interface UpdateFlowDraftDto {
       sourceType?: 'DOCUMENT' | 'ANY';
     }>;
     predecessorNodeIds?: string[];
+    /** 执行人列表（用户 ID） */
+    assignees?: string[];
+    /** 截止时间（ISO 8601 字符串） */
+    dueDate?: string;
+    /** 节点描述 */
+    description?: string;
+    /** 优先级 */
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    /** 预估工时（小时） */
+    estimatedHours?: number;
+    /** 节点类型（START / END / TASK），默认 'TASK' */
+    type?: NodeType;
   }>;
 }

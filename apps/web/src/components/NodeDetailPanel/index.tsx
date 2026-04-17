@@ -7,7 +7,6 @@ import {
   Input,
   List,
   Space,
-  Spin,
   Tag,
   Typography,
   message,
@@ -38,12 +37,12 @@ import type {
 
 const { Text, Title } = Typography;
 
-/** 状态标签颜色配置 */
+/** 状态标签颜色配置 —— 升级配色 */
 const STATUS_TAG: Record<ExecutionStatus, { color: string; label: string }> = {
   PENDING: { color: 'default', label: '待启动' },
-  READY: { color: 'blue', label: '可开始' },
+  READY: { color: 'purple', label: '可开始' },
   IN_PROGRESS: { color: 'orange', label: '进行中' },
-  GATE_CHECKING: { color: 'purple', label: '门禁检查中' },
+  GATE_CHECKING: { color: 'geekblue', label: '门禁检查中' },
   COMPLETED: { color: 'success', label: '已完成' },
   NEEDS_FIX: { color: 'error', label: '待补齐' },
 };
@@ -149,13 +148,13 @@ export default function NodeDetailPanel({
   return (
     <>
       <div className="node-detail-panel">
-        {/* 面板标题 */}
+        {/* 面板标题 —— 渐变背景 */}
         <div className="node-detail-panel__header">
           <Space>
-            <Title level={5} style={{ margin: 0 }}>
+            <Title level={5} style={{ margin: 0, fontSize: 15 }}>
               {execution.nodeName}
             </Title>
-            <Tag color={statusCfg.color}>{statusCfg.label}</Tag>
+            <Tag color={statusCfg.color} style={{ borderRadius: 6, fontWeight: 500 }}>{statusCfg.label}</Tag>
           </Space>
           <Button
             type="text"
@@ -165,6 +164,7 @@ export default function NodeDetailPanel({
               setLocalGateResult(null);
               onClose();
             }}
+            style={{ borderRadius: 'var(--radius-sm)' }}
           />
         </div>
 
@@ -197,7 +197,7 @@ export default function NodeDetailPanel({
           {/* 输出物要求 */}
           {requiredArtifacts.length > 0 && (
             <>
-              <Divider orientation="left" style={{ fontSize: 13, margin: '12px 0' }}>
+              <Divider orientation="left" style={{ fontSize: 13, margin: '12px 0', fontWeight: 600 }}>
                 输出物要求
               </Divider>
               <List
@@ -207,11 +207,11 @@ export default function NodeDetailPanel({
                   const isMissing = missingIds.has(artifact.id);
                   return (
                     <List.Item
+                      className={isMissing ? 'artifact-item-missing' : (execution.status === 'COMPLETED' ? 'artifact-item-bound' : '')}
                       style={{
-                        background: isMissing ? '#fff2f0' : undefined,
-                        borderRadius: 6,
-                        padding: '6px 10px',
-                        marginBottom: 4,
+                        padding: '8px 12px',
+                        marginBottom: 6,
+                        borderRadius: 'var(--radius-md)',
                       }}
                       actions={[
                         isMissing ? (
@@ -287,65 +287,67 @@ export default function NodeDetailPanel({
 
           <Divider style={{ margin: '16px 0' }} />
 
-          {/* 操作区 */}
-          {canStart && (
-            <div style={{ marginBottom: 12 }}>
-              {execution.status === 'NEEDS_FIX' && (
-                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>
-                  已补齐文档后，请点击「重新开始」将节点恢复为进行中，再提交。
-                </Text>
-              )}
-              <Button
-                type="primary"
-                block
-                icon={<PlayCircleOutlined />}
-                loading={startMut.isPending}
-                onClick={() => startMut.mutate()}
-              >
-                {execution.status === 'NEEDS_FIX' ? '重新开始（补齐后重试）' : '开始执行'}
-              </Button>
-            </div>
-          )}
+          {/* 操作区 —— 统一按钮样式 */}
+          <div className="action-btn-group">
+            {canStart && (
+              <div style={{ marginBottom: 12 }}>
+                {execution.status === 'NEEDS_FIX' && (
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8, lineHeight: 1.6 }}>
+                    已补齐文档后，请点击「重新开始」将节点恢复为进行中，再提交。
+                  </Text>
+                )}
+                <Button
+                  type="primary"
+                  block
+                  icon={<PlayCircleOutlined />}
+                  loading={startMut.isPending}
+                  onClick={() => startMut.mutate()}
+                >
+                  {execution.status === 'NEEDS_FIX' ? '重新开始（补齐后重试）' : '开始执行'}
+                </Button>
+              </div>
+            )}
 
-          {canSubmit && (
-            <div>
-              <Input.TextArea
-                placeholder="提交备注（可选）"
-                value={submitComment}
-                onChange={(e) => setSubmitComment(e.target.value)}
-                rows={2}
-                maxLength={200}
-                showCount
-                style={{ marginBottom: 8 }}
-              />
-              <Button
-                type="primary"
-                block
-                icon={<SendOutlined />}
-                loading={submitMut.isPending}
-                onClick={() => submitMut.mutate()}
-              >
-                提交完成（触发门禁检查）
-              </Button>
+            {canSubmit && (
+              <div>
+                <Input.TextArea
+                  placeholder="提交备注（可选）"
+                  value={submitComment}
+                  onChange={(e) => setSubmitComment(e.target.value)}
+                  rows={2}
+                  maxLength={200}
+                  showCount
+                  style={{ marginBottom: 8, borderRadius: 'var(--radius-md)' }}
+                />
+                <Button
+                  type="primary"
+                  block
+                  icon={<SendOutlined />}
+                  loading={submitMut.isPending}
+                  onClick={() => submitMut.mutate()}
+                >
+                  提交完成（触发门禁检查）
+                </Button>
             </div>
           )}
 
           {execution.status === 'COMPLETED' && (
-            <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <Spin spinning={false}>
-                <CheckCircleOutlined style={{ fontSize: 32, color: '#52c41a' }} />
-                <br />
-                <Text type="success" style={{ marginTop: 8, display: 'block' }}>
-                  节点已完成，门禁验证通过
-                </Text>
-              </Spin>
+            <div className="completed-celebration" style={{ textAlign: 'center', padding: '12px 0' }}>
+              <CheckCircleOutlined style={{ fontSize: 40, color: 'var(--color-success)' }} />
+              <br />
+              <Text type="success" style={{ marginTop: 8, display: 'block', fontWeight: 600, fontSize: 14 }}>
+                节点已完成，门禁验证通过
+              </Text>
             </div>
           )}
 
           {execution.status === 'PENDING' && (
-            <Text type="secondary" style={{ display: 'block', textAlign: 'center' }}>
-              等待前置节点完成后自动解锁……
-            </Text>
+            <div style={{ textAlign: 'center', padding: '16px 0' }}>
+              <div style={{ fontSize: 32, opacity: 0.4, marginBottom: 8 }}>⏳</div>
+              <Text type="secondary" style={{ display: 'block' }}>
+                等待前置节点完成后自动解锁…
+              </Text>
+            </div>
           )}
 
           {/* 上传文档快捷入口 */}
@@ -358,11 +360,13 @@ export default function NodeDetailPanel({
                   block
                   icon={<FileAddOutlined />}
                   onClick={() => setUploadOpen(true)}
+                  style={{ borderRadius: 'var(--radius-md)' }}
                 >
                   上传 / 绑定文档
                 </Button>
               </>
             )}
+          </div> {/* 关闭 action-btn-group */}
         </div>
       </div>
 

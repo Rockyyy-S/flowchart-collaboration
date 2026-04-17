@@ -38,6 +38,14 @@ import type {
 
 const { Text, Title } = Typography;
 
+/** 优先级标签配色：LOW=灰 / MEDIUM=蓝 / HIGH=橙 / URGENT=红 */
+const PRIORITY_TAG: Record<string, { color: string; label: string }> = {
+  LOW: { color: 'default', label: '低' },
+  MEDIUM: { color: 'blue', label: '中' },
+  HIGH: { color: 'orange', label: '高' },
+  URGENT: { color: 'red', label: '紧急' },
+};
+
 /** 状态标签颜色配置 */
 const STATUS_TAG: Record<ExecutionStatus, { color: string; label: string }> = {
   PENDING: { color: 'default', label: '待启动' },
@@ -200,6 +208,46 @@ export default function NodeDetailDrawer({
             </Descriptions.Item>
           )}
         </Descriptions>
+
+        {/* ── 节点配置扩展信息（描述 / 优先级 / 执行人 / 截止时间 / 预估工时） ── */}
+        {nodeConfig?.description && (
+          <div style={{ marginBottom: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>描述</Text>
+            <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.6 }}>
+              {nodeConfig.description}
+            </div>
+          </div>
+        )}
+        {nodeConfig?.priority && (
+          <div style={{ marginBottom: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}>优先级</Text>
+            <Tag color={PRIORITY_TAG[nodeConfig.priority]?.color ?? 'default'}>
+              {PRIORITY_TAG[nodeConfig.priority]?.label ?? nodeConfig.priority}
+            </Tag>
+          </div>
+        )}
+        {nodeConfig?.assignees && nodeConfig.assignees.length > 0 && (
+          <div style={{ marginBottom: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>执行人</Text>
+            <div style={{ marginTop: 4 }}>
+              {nodeConfig.assignees.map((uid) => (
+                <Tag key={uid} style={{ marginBottom: 4 }}>{uid}</Tag>
+              ))}
+            </div>
+          </div>
+        )}
+        {nodeConfig?.dueDate && (
+          <div style={{ marginBottom: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}>截止时间</Text>
+            <Text>{dayjs(nodeConfig.dueDate).format('YYYY-MM-DD HH:mm')}</Text>
+          </div>
+        )}
+        {nodeConfig?.estimatedHours != null && (
+          <div style={{ marginBottom: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12, marginRight: 8 }}>预估工时</Text>
+            <Text>{nodeConfig.estimatedHours} 小时</Text>
+          </div>
+        )}
 
         {/* ── 输出物要求 ── */}
         {requiredArtifacts.length > 0 && (

@@ -35,11 +35,11 @@ const STORAGE_KEY = 'flowkit_projects';
 const DEMO_FLOW = {
   graphJson: {
     nodes: [
-      { id: 'node-req', text: '需求评审' },
+      { id: 'node-req', text: '需求评审', type: 'START' },
       { id: 'node-tech', text: '技术方案评审' },
       { id: 'node-dev', text: '开发' },
       { id: 'node-qa', text: '测试验收' },
-      { id: 'node-deploy', text: '发布上线' },
+      { id: 'node-deploy', text: '发布上线', type: 'END' },
     ],
     edges: [
       { source: 'node-req', target: 'node-tech' },
@@ -52,6 +52,7 @@ const DEMO_FLOW = {
     {
       nodeId: 'node-req',
       name: '需求评审',
+      type: 'START',
       requiredArtifacts: [
         { id: 'art-prd', name: '产品需求文档(PRD)', required: true },
       ],
@@ -84,6 +85,7 @@ const DEMO_FLOW = {
     {
       nodeId: 'node-deploy',
       name: '发布上线',
+      type: 'END',
       requiredArtifacts: [
         { id: 'art-release-checklist', name: '发布清单', required: false },
       ],
@@ -176,13 +178,14 @@ export default function WorkbenchPage() {
       // 空白项目也初始化一个单节点示意草稿
       await updateFlowDraft(project.projectId, {
         graphJson: {
-          nodes: [{ id: 'node-start', text: '起始节点' }],
+          nodes: [{ id: 'node-start', text: '起始节点', type: 'START' }],
           edges: [],
         },
         nodesConfig: [
           {
             nodeId: 'node-start',
             name: '起始节点',
+            type: 'START',
             requiredArtifacts: [],
             predecessorNodeIds: [],
           },

@@ -4,10 +4,14 @@ import {
   IsArray,
   IsString,
   IsBoolean,
+  IsNumber,
+  IsDateString,
   ValidateNested,
   IsIn,
   IsNotEmpty,
   MaxLength,
+  Min,
+  Max,
   ArrayMaxSize,
   ArrayMinSize,
 } from 'class-validator';
@@ -62,6 +66,36 @@ export class NodeConfigDto {
   @ArrayMaxSize(20)
   @IsString({ each: true })
   predecessorNodeIds?: string[];
+
+  /** 执行人列表（用户 ID） */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(50)
+  assignees?: string[];
+
+  /** 截止时间（ISO 8601 日期字符串） */
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string;
+
+  /** 节点描述 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+
+  /** 优先级：LOW | MEDIUM | HIGH | URGENT */
+  @IsOptional()
+  @IsIn(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+  /** 预估工时（小时） */
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(10000)
+  estimatedHours?: number;
 }
 
 export class UpdateFlowDraftDto {

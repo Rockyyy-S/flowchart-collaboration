@@ -2,16 +2,16 @@ import { useEffect, useState } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import {
   Button,
+  Dropdown,
   Form,
   Input,
   Layout,
   Modal,
   Space,
-  Tag,
   Typography,
   message,
 } from 'antd';
-import { ApartmentOutlined, LogoutOutlined, SafetyOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, LogoutOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons';
 import { issueDevToken } from '../../api/auth';
 import {
   clearTokenSnapshot,
@@ -24,8 +24,8 @@ const { Header, Content } = Layout;
 
 /**
  * 全局应用布局
- * - 顶部固定导航栏
- * - 主内容区域（响应式内边距）
+ * - 顶部毛玻璃导航栏（品牌渐变条 + 用户头像入口）
+ * - 主内容区域铺满 Header 以下
  */
 export default function AppLayout() {
   const [tokenSnapshot, setSnapshot] = useState(getTokenSnapshot);
@@ -55,69 +55,104 @@ export default function AppLayout() {
     }
   }
 
+  /* 用户头像首字母 */
+  const avatarChar = tokenSnapshot?.userId ? tokenSnapshot.userId.charAt(0).toUpperCase() : '?';
+
   return (
-    <Layout style={{ background: '#f5f6fa', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* 顶部导航 */}
+    <Layout style={{ background: 'var(--color-bg-base)', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* 顶部导航 —— 毛玻璃效果 */}
       <Header
+        className="app-header"
         style={{
-          background: '#fff',
-          borderBottom: '1px solid #f0f0f0',
           padding: '0 24px',
           display: 'flex',
           alignItems: 'center',
           gap: 8,
           flexShrink: 0,
-          zIndex: 100,
+          height: 56,
+          lineHeight: '56px',
         }}
       >
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ApartmentOutlined style={{ fontSize: 22, color: '#1677ff' }} />
-          <Typography.Text strong style={{ fontSize: 17, color: '#222' }}>
-            Flowkit
-          </Typography.Text>
+        {/* 品牌入口 */}
+        <Link to="/" className="app-brand">
+          <ApartmentOutlined className="app-brand__icon" />
+          <span className="app-brand__text">Flowkit</span>
         </Link>
+
+        {/* 右侧用户区域 */}
         <div style={{ marginLeft: 'auto' }}>
-          <Space>
-            {tokenSnapshot ? (
-              <>
-                <Tag color="success" icon={<SafetyOutlined />}>
-                  已登录 {tokenSnapshot.userId ? `(${tokenSnapshot.userId})` : ''}
-                </Tag>
-                <Button size="small" onClick={() => setLoginOpen(true)}>
-                  更换令牌
-                </Button>
-                <Button
-                  size="small"
-                  icon={<LogoutOutlined />}
-                  onClick={() => {
-                    clearTokenSnapshot();
-                    message.info('已清除本地令牌');
-                  }}
-                >
-                  退出
-                </Button>
-              </>
-            ) : (
-              <Button size="small" type="primary" onClick={() => setLoginOpen(true)}>
-                获取开发令牌
-              </Button>
-            )}
-          </Space>
+          {tokenSnapshot ? (
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'user',
+                    label: (
+                      <Space>
+                        <SafetyOutlined style={{ color: 'var(--color-success)' }} />
+                        <span>已登录: {tokenSnapshot.userId}</span>
+                      </Space>
+                    ),
+                    disabled: true,
+                  },
+                  { type: 'divider' },
+                  {
+                    key: 'switch',
+                    label: '更换令牌',
+                    onClick: () => setLoginOpen(true),
+                  },
+                  {
+                    key: 'logout',
+                    label: '退出登录',
+                    icon: <LogoutOutlined />,
+                    danger: true,
+                    onClick: () => {
+                      clearTokenSnapshot();
+                      message.info('已清除本地令牌');
+                    },
+                  },
+                ],
+              }}
+              placement="bottomRight"
+              trigger={['click']}
+            >
+              <div className="user-avatar-btn">
+                <div className="user-avatar-circle">{avatarChar}</div>
+                <Typography.Text style={{ fontSize: 13, fontWeight: 500 }}>
+                  {tokenSnapshot.userId}
+                </Typography.Text>
+              </div>
+            </Dropdown>
+          ) : (
+            <Button
+              type="primary"
+              icon={<UserOutlined />}
+              onClick={() => setLoginOpen(true)}
+              style={{
+                borderRadius: 'var(--radius-xl)',
+                fontWeight: 500,
+                boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
+              }}
+            >
+              登录
+            </Button>
+          )}
         </div>
       </Header>
 
-      {/* 主内容区 —— 铺满 Header 以下所有空间，不限宽 */}
-      <Content
-        style={{
-          flex: 1,
-          overflow: 'hidden',
-        }}
-      >
+      {/* 主内容区 —— 铺满 Header 以下所有空间 */}
+      <Content style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
       </Content>
 
+      {/* 登录弹窗 —— 美化 */}
       <Modal
-        title="获取开发令牌"
+        title={
+          <Space>
+            <SafetyOutlined style={{ color: 'var(--color-primary)' }} />
+            <span>获取开发令牌</span>
+          </Space>
+        }
         open={loginOpen}
         onCancel={() => {
           setLoginOpen(false);
@@ -128,9 +163,11 @@ export default function AppLayout() {
         cancelText="取消"
         confirmLoading={issuingToken}
         destroyOnClose
+        className="login-modal"
+        width={420}
       >
-        <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
-          该流程用于开发联调，调用公开接口签发 JWT，替代旧版 x-user-id 头。
+        <Typography.Paragraph type="secondary" style={{ marginTop: 8, fontSize: 13 }}>
+          开发联调专用，调用公开接口签发 JWT。生产环境将接入正式账号体系。
         </Typography.Paragraph>
         <Form form={form} layout="vertical" initialValues={{ userId: 'user-001' }}>
           <Form.Item
@@ -142,7 +179,14 @@ export default function AppLayout() {
               { max: 64, message: '用户 ID 不超过 64 个字符' },
             ]}
           >
-            <Input placeholder="例如：user-001" autoFocus maxLength={64} />
+            <Input
+              prefix={<UserOutlined style={{ color: 'var(--color-text-muted)' }} />}
+              placeholder="例如：user-001"
+              autoFocus
+              maxLength={64}
+              size="large"
+              style={{ borderRadius: 'var(--radius-md)' }}
+            />
           </Form.Item>
         </Form>
       </Modal>

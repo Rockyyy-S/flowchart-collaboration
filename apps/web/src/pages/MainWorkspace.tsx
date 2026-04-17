@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Result, Segmented, Skeleton, Space, Typography, message } from 'antd';
-import { ExclamationCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Alert, Result, Skeleton, Space, Typography, message } from 'antd';
+import {
+  AppstoreOutlined,
+  ExclamationCircleOutlined,
+} from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getExecutions } from '../api/executions';
 import { getCurrentFlow, updateFlowDraft } from '../api/flows';
@@ -83,12 +86,12 @@ export default function MainWorkspace() {
   }
 
   /** 选中项目 */
-  function handleSelectProject(projectId: string, role: 'OWNER' | 'MEMBER' | 'VIEWER') {
+  function handleSelectProject(projectId: string, role: 'OWNER' | 'MEMBER' | 'VIEWER', initialMode?: 'view' | 'edit') {
     setSelectedProjectId(projectId);
     setSelectedProjectRole(role);
     /* 切换项目时关闭右侧面板并重置模式 */
     setSelectedExecution(null);
-    setCanvasMode('view');
+    setCanvasMode(initialMode ?? 'view');
   }
 
   /** 点击画布节点 */
@@ -171,53 +174,34 @@ export default function MainWorkspace() {
           />
         )}
 
-        {/* 未选择项目空态 */}
+        {/* 未选择项目空态 —— 友好引导图文 */}
         {!selectedProjectId ? (
           <div className="main-workspace__empty">
             <Result
-              icon={<img src="" alt="" style={{ display: 'none' }} />}
-              title="请从左侧选择一个项目"
-              subTitle="或点击「新建」/「快速体验」创建项目"
+              icon={<AppstoreOutlined style={{ fontSize: 64, color: 'var(--color-primary-light)', opacity: 0.6 }} />}
+              title={<span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>选择一个项目开始工作</span>}
+              subTitle={
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>
+                  从左侧面板选择已有项目，或点击「新建」/「快速体验」创建新项目
+                </span>
+              }
             />
           </div>
         ) : flowLoading || execLoading ? (
-          <div style={{ padding: 24 }}>
-            <Skeleton active paragraph={{ rows: 5 }} />
+          <div className="skeleton-container">
+            <Skeleton active title={{ width: '30%' }} paragraph={{ rows: 2, width: ['60%', '40%'] }} style={{ marginBottom: 24 }} />
+            <Skeleton active paragraph={{ rows: 6 }} />
           </div>
         ) : flowError ? (
           <div className="main-workspace__empty">
             <Result
               status="404"
               title="找不到流程定义"
-              subTitle="该项目尚未配置流程，或项目不存在。后端为内存存储，重启后数据会丢失。"
+              subTitle={<span style={{ color: 'var(--color-text-secondary)' }}>该项目尚未配置流程，或项目不存在。后端为内存存储，重启后数据会丢失。</span>}
             />
           </div>
         ) : flowDefinition ? (
           <>
-            {/* 模式切换工具栏（悬浮在画布上方） */}
-            <div className="main-workspace__mode-bar">
-              <Space size={10}>
-                {/* 仅 OWNER 可切换编辑模式 */}
-                {selectedProjectRole === 'OWNER' && (
-                  <Segmented
-                    size="small"
-                    value={canvasMode}
-                    options={[
-                      { label: '执行模式', value: 'view' },
-                      { label: '编辑模式', value: 'edit' },
-                    ]}
-                    onChange={handleModeChange}
-                  />
-                )}
-                <Text
-                  type="link"
-                  style={{ fontSize: 12, cursor: 'pointer' }}
-                  onClick={handleRefresh}
-                >
-                  <ReloadOutlined /> 刷新
-                </Text>
-              </Space>
-            </div>
             <FlowCanvas
               flowDefinition={flowDefinition}
               executions={executions}
@@ -226,6 +210,9 @@ export default function MainWorkspace() {
               saving={saveDraftMut.isPending}
               onSaveDraft={(dto) => saveDraftMut.mutate(dto)}
               onNodeClick={handleNodeClick}
+              canSwitchMode={selectedProjectRole === 'OWNER'}
+              onModeChange={handleModeChange}
+              onRefresh={handleRefresh}
             />
           </>
         ) : (

@@ -1,5 +1,5 @@
 import { Alert, List, Tag, Typography } from 'antd';
-import { ExclamationCircleFilled, CheckCircleFilled } from '@ant-design/icons';
+import { ExclamationCircleFilled, CheckCircleFilled, LoadingOutlined } from '@ant-design/icons';
 import type { GateResult } from '../../api/types';
 
 const { Text } = Typography;
@@ -11,10 +11,9 @@ interface GateResultPanelProps {
 }
 
 /**
- * 门禁结果面板
+ * 门禁结果面板 —— 增强视觉区分
  *
- * 展示最近一次门禁检查的通过/失败结果及缺失输出物明细。
- * 放置于 NodeDetailDrawer 内，紧跟提交操作之后。
+ * 通过/失败/检查中三种状态使用不同渐变背景和图标，视觉差异更大。
  */
 export default function GateResultPanel({ gateResult, checking }: GateResultPanelProps) {
   if (checking) {
@@ -22,8 +21,10 @@ export default function GateResultPanel({ gateResult, checking }: GateResultPane
       <Alert
         type="info"
         showIcon
-        message="门禁检查中…"
+        icon={<LoadingOutlined spin />}
+        message={<Text strong>门禁检查中…</Text>}
         description="系统正在校验必需输出物，请稍候。"
+        className="gate-result-checking"
         style={{ marginTop: 12 }}
       />
     );
@@ -36,9 +37,10 @@ export default function GateResultPanel({ gateResult, checking }: GateResultPane
       <Alert
         type="success"
         showIcon
-        icon={<CheckCircleFilled />}
-        message="门禁通过"
+        icon={<CheckCircleFilled style={{ fontSize: 20 }} />}
+        message={<Text strong style={{ color: 'var(--color-success)' }}>门禁通过</Text>}
         description="所有必需输出物均已绑定，节点已完成。"
+        className="gate-result-pass"
         style={{ marginTop: 12 }}
       />
     );
@@ -48,25 +50,26 @@ export default function GateResultPanel({ gateResult, checking }: GateResultPane
     <Alert
       type="error"
       showIcon
-      icon={<ExclamationCircleFilled />}
-      message="门禁未通过 — 缺少以下必需文档"
+      icon={<ExclamationCircleFilled style={{ fontSize: 20 }} />}
+      message={<Text strong style={{ color: 'var(--color-error)' }}>门禁未通过 — 缺少以下必需文档</Text>}
       description={
         <List
           size="small"
           dataSource={gateResult.missingArtifacts}
           renderItem={(item) => (
-            <List.Item style={{ padding: '4px 0' }}>
-              <Tag color="error" style={{ marginRight: 6 }}>
+            <List.Item style={{ padding: '6px 0' }}>
+              <Tag color="error" style={{ marginRight: 8, borderRadius: 6 }}>
                 缺失
               </Tag>
-              <Text>{item.name}</Text>
+              <Text strong>{item.name}</Text>
               <Text type="secondary" style={{ fontSize: 11, marginLeft: 6 }}>
-                (requirementId: {item.requirementId})
+                ({item.requirementId})
               </Text>
             </List.Item>
           )}
         />
       }
+      className="gate-result-fail"
       style={{ marginTop: 12 }}
     />
   );

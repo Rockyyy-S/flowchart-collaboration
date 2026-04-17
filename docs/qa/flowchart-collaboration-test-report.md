@@ -489,3 +489,151 @@ $D | Format-Table -AutoSize
 2. 对比保存前后 flow 接口返回，核对 graphJson、nodesConfig、predecessorNodeIds 一致性。
 3. 在执行模式复测节点抽屉核心操作（开始、提交、补齐、重试）并留存 requestId 与响应摘要。
 4. 完成上述证据回填后，发起 QA 门禁复核（目标：关闭历史“运行时联调证据缺失”阻塞项）。
+
+---
+
+## 专项回归：UI 全面美化变更（v0.9）
+
+> 版本：v0.9 | 日期：2026-04-16 | 验证方式：静态代码审查 + TypeScript 诊断
+> 变更背景：前端完成一次全局视觉/交互美化改造（毛玻璃导航、CSS 变量体系、贝塞尔曲线连线、拖拽视觉反馈等），本轮专项验证其是否破坏既有功能。
+
+### 测试范围
+
+| 验证维度 | 覆盖文件 | 方法 |
+|---|---|---|
+| TypeScript 类型安全 | apps/web/src 全量 | 工作区诊断（No errors found） |
+| CSS 类名与 JS 引用一致性 | index.css + 所有组件 .tsx | 逐一对照 grep |
+| draggingNodeId 状态生命周期 | FlowCanvas/index.tsx | 代码路径追踪 |
+| AppLayout Dropdown 令牌逻辑 | layout/AppLayout.tsx | 代码路径追踪 |
+| 贝塞尔曲线坐标计算边界安全 | FlowCanvas/index.tsx | 数学分析 |
+| CSS keyframes 命名冲突 | index.css | 全量 grep |
+| 功能核心路径完整性 | 全部组件 | 静态链路追踪 |
+
+### 结果与缺陷
+
+#### 1. TypeScript 类型安全
+
+**结论：通过 ✅**
+
+工具诊断结果：`No errors found`（已验证 apps/web/src 全量文件）。  
+各组件 props 类型声明完整：`FlowCanvasProps`、`NodeDetailPanelProps`、`NodeCardProps`、`GateResultPanelProps` 均有明确接口定义，无裸 `any` 暴露。
+
+#### 2. CSS 类名与 JS className 一致性
+
+**结论：通过 ✅**（含一处 P1 警告，见缺陷 BUG-20260416-01）
+
+逐项核对结果：
+
+| className（JS 中使用） | CSS 中定义 | 结论 |
+|---|---|---|
+| `app-header` | line 84 ✅ | 一致 |
+| `app-brand`, `app-brand__icon`, `app-brand__text` | line 106/116/123 ✅ | 一致 |
+| `user-avatar-btn`, `user-avatar-circle` | line 134/149 ✅ | 一致 |
+| `main-workspace`, `main-workspace__center`, `main-workspace__empty` | line 165/173/201 ✅ | 一致 |
+| `skeleton-container` | line 652 ✅ | 一致 |
+| `project-list-panel`, `project-list-item`, `project-list-empty` | line 217/270/299 ✅ | 一致 |
+| `flow-canvas-wrapper/toolbar/container/transform/edges` | line 436-478 ✅ | 一致 |
+| `flow-edge`, `flow-edge-animated` | line 491/500 ✅ | 一致 |
+| `real-flow-node`, `real-flow-node--dragging` | line 508/524 ✅ | 一致 |
+| `node-card-{PENDING/READY/IN_PROGRESS/GATE_CHECKING/COMPLETED/NEEDS_FIX}` | line 545-585 ✅ | 一致 |
+| `node-detail-panel`, `__header`, `__body` | line 337/355/364 ✅ | 一致 |
+| `gate-result-pass`, `gate-result-fail`, `gate-result-checking` | line 394/399/404 ✅ | 一致 |
+| `action-btn-group` | line 411（子选择器定义）✅ | 一致 |
+| `login-modal` | line 624 ✅ | 一致 |
+| `flow-node-card`（NodeCard.tsx 使用） | line 595 ✅ | 定义存在但组件未被引用 → 见 BUG-20260416-01 |
+
+#### 3. draggingNodeId 状态生命周期
+
+**结论：通过 ✅**
+
+追踪路径：
+1. `handleNodeMouseDown`（鼠标按下）→ `setDraggingNodeId(nodeId)` 设置
+2. `handleMouseMove`（window 级）→ 使用 `draggingRef.current` 更新节点坐标（不依赖 `draggingNodeId`，无渲染阻塞）
+3. `handleMouseUp`（window 级）→ `draggingRef.current = null` + `setDraggingNodeId(null)` 清理
+
+关键：`mouseup` 监听注册在 `window` 上（非组件容器），确保鼠标拖出边界后释放仍能正确清理。Effect 返回清理函数，组件卸载时解绑监听，无内存泄漏。
+
+#### 4. AppLayout Dropdown 令牌逻辑
+
+**结论：通过 ✅**
+
+三个动作链路：
+- **更换令牌**：`onClick: () => setLoginOpen(true)` → 复用登录弹窗 → `handleIssueToken` → `setTokenSnapshot` → `subscribeTokenChange` 回调更新 snapshot
+- **退出登录**：`onClick: () => clearTokenSnapshot()` + `message.info` → `subscribeTokenChange` 回调将 `tokenSnapshot` 置为 `null`，UI 切回「登录」按钮
+- **未登录入口**：渲染普通 `<Button>` 调用 `setLoginOpen(true)` → 同一登录弹窗
+
+`subscribeTokenChange` 驱动状态同步，AppLayout 与 MainWorkspace 中均有订阅，令牌变更全局实时反映。
+
+#### 5. 贝塞尔曲线坐标计算边界安全
+
+**结论：通过 ✅（零 NaN / 零除零风险；存在一处退化边缘场景，评级 P2）**
+
+数学分析：
+```
+x1 = src.x + NODE_WIDTH/2    // 常量偏移，不涉及除法
+dx = Math.abs(x2 - x1)       // >= 0，无 NaN
+curvature = Math.min(dx,dy) * 0.4 + 30  // 最小值 30，永不为 0
+Math.sign(x2-x1)              // 返回 -1/0/1，无 NaN
+```
+
+当两节点完全重叠（x1==x2 && y1==y2）时：`Math.sign(0)=0`，控制点坐标等于端点，贝塞尔曲线退化为直线（起点=终点=一个点），SVG 会渲染为不可见路径；**不会抛出异常、不产生 NaN**。此场景为极端用户操作（节点完全重叠），功能降级可接受（P2）。
+
+#### 6. CSS keyframes 命名冲突检查
+
+**结论：通过 ✅**
+
+index.css 中共定义 4 个 keyframes，名称互不冲突：
+
+| 名称 | 行号 | 用途 |
+|---|---|---|
+| `fadeIn` | 209 | 空态引导、骨架屏淡入 |
+| `slideInRight` | 350 | 右侧面板滑入 |
+| `popIn` | 428 | 节点卡片弹入 |
+| `flowDash` | 487 | 连线流动动画 |
+
+#### 7. 功能核心路径完整性
+
+**结论：通过 ✅**（含一处 P2 缺陷，见 BUG-20260416-02）
+
+| 路径 | 代码完整性 | 备注 |
+|---|---|---|
+| 项目列表加载（令牌→GET /projects→渲染分组） | ✅ | `useQuery` + `getAccessToken` + localStorage 降级，分组渲染逻辑完整 |
+| 画布渲染（graphJson+executions→节点+贝塞尔连线） | ✅ | `normalizeCanvasNodes` + `linkedEdges` + SVG path 生成完整 |
+| 节点拖拽（mousedown→mousemove→mouseup 生命周期） | ✅ | 见项目 3，window 级监听完整 |
+| 右侧面板操作（开始→提交→门禁→展示） | ✅ | `startMut`/`submitMut`/`localGateResult`/`GateResultPanel` 链路完整 |
+| 令牌管理（登录/更换/退出三动作） | ✅ | 见项目 4 |
+
+### 缺陷清单
+
+#### 🟡 P1 — BUG-20260416-01：NodeCard.tsx 为孤立文件，`flow-node-card` CSS 类变为死代码
+
+- **现象**：`apps/web/src/components/FlowCanvas/NodeCard.tsx` 未被任何文件 import。FlowCanvas 已改为直接在 SVG canvas 中内联渲染节点（`real-flow-node`），NodeCard 的 `flow-node-card`/`node-card-*` CSS 双份规则（line 595-619）成为死代码。
+- **影响**：不影响当前运行时功能；但形成代码混淆风险——后续开发者可能误引 NodeCard 导致双套渲染逻辑混用，或在维护 CSS 时产生困惑。
+- **修复建议**：确认 NodeCard.tsx 不再需要后，删除文件并清理 index.css 中 `.flow-node-card` 相关规则（line 595-619）。或若未来需复用卡片组件，应将 FlowCanvas 节点渲染提取回 NodeCard 并统一 className。
+- **验证方式**：grep 确认无 import 后可安全删除（需人工确认意图）。
+
+#### 🟢 P2 — BUG-20260416-02：GATE_CHECKING 状态下 GateResultPanel 显示空白
+
+- **现象**：`execution.status === 'GATE_CHECKING'` 时，后端门禁检查进行中，但 `submitMut.isPending`（控制 `checking` prop）此时为 `false`（submit 请求已完成），同时 `serverGateResult` 查询的 `enabled` 条件仅为 `NEEDS_FIX | COMPLETED`，不含 `GATE_CHECKING`，导致 GateResultPanel 既不显示「检查中」也不显示任何结果。
+- **影响**：用户在节点进入 GATE_CHECKING 短暂窗口期无视觉反馈，体验略差，但门禁最终结果（COMPLETED / NEEDS_FIX）出来后会正常渲染。不阻塞功能。
+- **修复建议**：将 `checking` prop 改为 `submitMut.isPending || execution?.status === 'GATE_CHECKING'`，或将 `serverGateResult` 的 `enabled` 条件加入 `GATE_CHECKING`。
+
+#### 🟢 P2 — BUG-20260416-03：两节点完全重叠时连线不可见
+
+- **现象**：贝塞尔曲线两个控制点退化为端点，SVG path 渲染为不可见的点路径。
+- **影响**：仅发生在两节点坐标完全重叠的极端场景，正常操作不可触发。
+- **修复建议**：无需立即处理，可在后续版本添加节点碰撞检测防止重叠。
+
+### 放行建议
+
+- **本次美化变更结论：建议通过** — 全部可视化/交互改动未引入新的阻塞级缺陷，CSS 类名一致、TypeScript 零错误、draggingNodeId 和令牌逻辑完整。
+- **P1 缺陷 BUG-20260416-01**：建议在下一迭代清理 NodeCard.tsx 孤立文件，不阻塞当前发布。
+- **P2 缺陷 BUG-20260416-02/03**：可在后续版本迭代修复，不阻塞发布。
+- **项目整体 QA 门禁**：❌ 仍未通过。原因同前：历史遗留运行时联调证据仍未补齐。
+
+### 回归计划（本轮新增）
+
+1. 在真实浏览器环境验证拖拽视觉反馈（节点拖拽时 `real-flow-node--dragging` 样式是否正确显示）。
+2. 验证头像 Dropdown 三个令牌动作在真实浏览器下的交互响应（登录/更换/退出）。
+3. 验证 GATE_CHECKING 状态下门禁面板的显示（修复 BUG-20260416-02 后验证）。
+4. 修复 BUG-20260416-01 后，回归节点渲染完整性（确认 `real-flow-node` 样式一致）。

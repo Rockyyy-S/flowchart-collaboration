@@ -38,6 +38,16 @@ export interface NodeConfig {
   name: string;
   type: string;
   requiredArtifacts: ArtifactRequirement[];
+  /** 执行人列表（用户 ID） */
+  assignees?: string[];
+  /** 截止时间 */
+  dueDate?: Date;
+  /** 节点描述 */
+  description?: string;
+  /** 优先级：LOW | MEDIUM | HIGH | URGENT */
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  /** 预估工时（小时） */
+  estimatedHours?: number;
 }
 
 /** 流程定义（含草稿与已发布版本） */

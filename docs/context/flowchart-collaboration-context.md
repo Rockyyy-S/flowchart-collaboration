@@ -1,6 +1,6 @@
 # flowchart-collaboration Context Doc
 
-> 版本：v2.2 | 日期：2026-04-16 | 负责角色：文档撰写员 | 状态：已同步前端“真实流程画布”相关用户文档与实现总结；阶段门禁结论保持不变
+> 版本：v2.3 | 日期：2026-04-16 | 负责角色：QA 专家 | 状态：已完成 UI 美化专项回归（v0.9）：未发现新增阻塞级缺陷；P1 孤立文件 BUG-20260416-01 + P2 × 2；QA 门禁因历史运行时联调证据缺失仍❌
 
 ## 元信息
 
@@ -31,9 +31,9 @@
 |---|---|---|---|---|
 | 需求澄清 | ✅完成 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) | 2026-04-13 | PRD v1.0 已形成需求基线。 |
 | 架构边界 | ✅完成 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) | 2026-04-14 | v0.1 MVP 架构边界已冻结，可支持前后端并行开发。 |
-| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-16 | 已完成三栏布局改造：全屏画布 + 左侧项目列表 + 右侧节点详情面板；画布支持拖动平移（Pan）和双击新增节点；编辑模式仅 OWNER 可用；路由简化为单页面。 |
+| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-16 | 已完成三栏布局改造 + UI 全面美化 + 多人节点圆形渲染与分叉连线 + 节点类型系统（START 椭圆 / END 同心圆 / TASK 矩形）：起始节点强制第一创建、终止节点工具栏快捷添加、保存门禁有效性验证、椭圆碰撞计算、节点删除保护。 |
 | 后端实现 | ✅完成 | [flowchart-collaboration-backend-summary](../implementation/flowchart-collaboration-backend-summary.md) | 2026-04-15 | 已补齐当前架构下可落地的中危整改：OWNER 审计查询、基础内存限流、submit 原子提交/失败回滚；JWT、项目级访问控制、上传安全与 DTO 校验继续保持。 |
-| QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) | 2026-04-16 | 已完成前端流程图编辑器专项回归：本次改动未发现新增阻塞级缺陷；但运行时联调证据仍未补齐，QA 门禁❌。 |
+| QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) | 2026-04-16 | 已完成前端流程图编辑器专项回归 + UI 美化专项回归（v0.9）：本次美化改动未发现新增阻塞级缺陷（P1×1 孤立文件，P2×2 体验小问题）；但运行时联调证据仍未补齐，QA 门禁❌。 |
 | 安全审查 | ✅完成 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) | 2026-04-16 | 第三轮复审完成：VUL-10/11/12/13 全部关闭，安全门禁通过（v0.5）。 |
 | 文档沉淀 | ✅完成 | [flowchart-collaboration-context](flowchart-collaboration-context.md)、[quick-reference-guide](../quick-reference-guide.md)、[flowchart-collaboration-user-guide](../user-docs/flowchart-collaboration-user-guide.md)、[flowchart-collaboration-maintenance-runbook](../ops/flowchart-collaboration-maintenance-runbook.md) | 2026-04-14 | MVP 文档沉淀完成：用户操作指南 + 维护运维手册已落地；2026-04-16 已同步真实流程画布与编辑模式说明。 |
 | 发布准备 | ❌阻塞 | [v0.1.0-release-note](../releases/v0.1.0-release-note.md) | 2026-04-15 | 已形成上线/回滚清单与灰度演练记录；安全门禁已通过（v0.5），当前仅阻塞项为 QA 运行时联调证据缺失。 |
@@ -44,7 +44,7 @@
 |---|---|---|---|
 | 需求门禁 | ✅通过 | PRD v1.0 已完成评审状态标记，可作为后续阶段输入。 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) |
 | 架构门禁 | ✅通过 | 已完成 v0.1 架构边界文档，覆盖分层、契约、约束与里程碑。 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) |
-| QA 门禁 | ❌未通过 | 本轮前端流程图编辑器回归确认：可视化画布、编辑能力、保存一致性、执行态抽屉兼容与前端类型检查均通过，未发现本次变更新增阻塞级缺陷；项目整体仍缺运行时联调证据，暂不满足放行条件。 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) |
+| QA 门禁 | ❌未通过 | 本轮前端流程图编辑器回归 + UI 美化专项回归（v0.9）均确认：可视化画布、编辑能力、保存一致性、执行态面板兼容、TypeScript 零错误、draggingNodeId 清理完整、令牌 Dropdown 逻辑正确、贝塞尔曲线无 NaN 风险、CSS 类名一致；未发现新增阻塞级缺陷（P1×1 为孤立文件，P2×2 为体验小问题）；项目整体仍缺运行时联调证据，暂不满足放行条件。 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) |
 | 安全门禁 | ✅通过 | 三轮复审完成：VUL-01~13 全部关闭或降级，安全门禁通过。 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) |
 | 发布门禁 | ❌未通过 | QA 仍阻塞（仅缺运行时联调证据），发布申请暂缓。 | [v0.1.0-release-note](../releases/v0.1.0-release-note.md) |
 
@@ -98,6 +98,60 @@
 - 编辑模式 OWNER 限定：仅当前用户 role === 'OWNER' 时显示"编辑模式"切换按钮。
 - 路由简化：移除 `/projects/:projectId` 路由，主页面直接渲染三栏布局，项目切换通过左侧面板完成。
 - 新增 `MainWorkspace` 页面组件：统一编排三栏布局与数据流。
+
+### 前端（2026-04-17 模式切换 UX 优化）
+
+- 优化 FlowCanvas 工具栏：将编辑/执行模式切换 Segmented 提取为工具栏左侧固定区域，消除两份重复代码（原编辑工具栏 + 查看工具栏各一份 → 合并为统一工具栏一份）。
+- 移除冗余 Tag 标签（"✏️ 编辑模式" / "👁️ 执行模式"），模式已由 Segmented 选中态充分表达。
+- 编辑模式工具栏增加暖色调视觉反馈（极浅橙色渐变背景 + 金色底边），执行模式保持冷色调（默认蓝灰 + 靛蓝底边），一眼可区分当前模式。
+- 工具栏内容切换添加 CSS 进场动画（opacity + translateY 0.3s ease），避免突然切换的生硬感。
+- 操作提示文字移至工具栏最右侧、降低视觉权重（opacity 0.65 + 小字号），保留功能但不喧宾夺主。
+- 涉及文件：`apps/web/src/components/FlowCanvas/index.tsx`（工具栏 JSX 重构）、`apps/web/src/index.css`（新增 toolbar 子类样式与动画）。
+- 不改后端 API、不改 MainWorkspace 状态管理逻辑、不改 FlowCanvas props 接口、原有按钮功能完全保留。
+### 前端（2026-04-16 流程画布核心功能增强）
+
+- 子流程按钮与并行分支：编辑模式下 TASK 节点（矩形及多人圆形）hover 时右侧显示"+"按钮（22px 圆形），点击弹出 Dropdown 菜单可选"向上/向下添加子流程"；子流程节点自动创建在主流程节点左侧偏移 -250px 位置并自动建立连线关系。
+- 智能删除节点（自动重连）：删除节点时自动计算所有前驱和后继，生成 predecessor→successor 补偿边后再删除节点及关联边（如 A→B→C 删 B 后自动变为 A→C）；START/END 节点保护逻辑不变。
+- 拖拽插入节点到两节点之间：拖拽节点时实时检测被拖拽节点中心与各条连线中点的距离（阈值 60px），命中时连线高亮（`flow-edge-insert-highlight`）并显示"释放插入"提示标签；释放时自动删除原边、创建两条新边并将被拖拽节点吸附到连线中点位置。
+- 新增 CSS 类：`.subprocess-add-btn`（子流程按钮样式与 hover 过渡）、`.flow-edge-insert-highlight`（拖拽插入连线高亮）、`.insert-hint-label`（释放插入浮动标签）。
+- TypeScript 零编译错误；不涉及后端 API 变更或 types.ts 接口修改。
+### 前端（2026-04-16 节点类型系统）
+
+- 类型定义扩展：`GraphNode` 新增 `type?: NodeType`，`NodeConfig` 和 `UpdateFlowDraftDto` 新增 `nodeType?: NodeType`，导出 `NodeType = 'START' | 'END' | 'TASK'` 类型别名。
+- 起始节点（START）：椭圆形渲染（160×72px，border-radius: 50%），紫色渐变背景，居中显示节点名 + "🚀 起始"标签 + 已就绪资料数量；创建弹窗标题改为"创建起始节点"，表单区域标记为"已就绪资料"。
+- 终止节点（END）：同心圆渲染（外圆 100px，内圆通过 `::after` 伪元素实现双圈效果）；未完成状态灰色虚线 + 半透明内圈，已完成状态绿色实线 + 绿色填充 + 脉冲动画。
+- 节点创建约束：流程首个节点强制为 START 类型（`nodes.length === 0` 时自动锁定）；工具栏新增"添加终止节点"按钮（仅无 END 节点时显示），点击后在画布最下方节点下方 150px 自动创建。
+- 流程图保存门禁：`handleSave` 保存前校验必须同时包含 START 和 END 节点；START 入边 = 0、出边 = 1；END 出边 = 0、入边 ≥ 1；校验失败 `message.warning()` 给出具体原因。
+- 连线碰撞适配：新增 `getEllipseEdgePoint` 函数用于椭圆碰撞计算，新增 `getNodeShape` 统一获取节点尺寸与形状类型（ellipse/circle/rect），所有边渲染按节点类型选择对应碰撞函数。
+- 节点保护：START/END 节点禁止删除（点击删除时 `message.warning` 提示），不参与多人圆形判定。
+- TypeScript 零编译错误，不涉及后端 API 或数据库变更。
+
+### 前端（2026-04-16 多人节点圆形渲染与分叉连线）
+
+- 多人节点判定：当 `nodeConfigMap.get(nodeId)?.assignees?.length > 1` 时判定为"多人节点"，渲染为直径 120px 正圆（`.real-flow-node--circle`），其余节点保持原有 180×96 矩形。
+- 圆形节点内容：居中紧凑显示状态 Emoji、节点名（溢出省略）、状态标签、多人标识（👥 N人）。
+- 分叉连线效果：多人节点出边从圆底部出发 / 入边从圆顶部进入，多条连线汇聚或发散于同一锚点形成并行网关分叉视觉；圆→圆连线使用通用半径交点。
+- 连线计算适配：新增 `getCircleEdgePoint()` 函数，按圆心→目标方向计算半径交点；矩形→矩形保持原有 `getEdgePoint()` 逻辑不变。
+- CSS 新增 `.real-flow-node--circle` 样式类：`border-radius: 50%`、flex 居中、隐藏左侧色条；状态色类（PENDING/READY/IN_PROGRESS 等）在圆形节点上同样生效。
+- 拖拽兼容：圆形节点 left/top = 逻辑坐标（与矩形统一），宽高改为 CIRCLE_DIAMETER；居中按钮计算同步适配。
+- 编辑模式兼容：选中高亮（shadow-glow）、删除、连线操作对圆形节点同样生效。
+- TypeScript 零编译错误。
+- 完成交接：to_qa（回归验证多人圆形节点渲染、分叉连线、拖拽与编辑模式交互）。
+
+### 前端（2026-04-16 UI 全面美化）
+
+- 全局视觉升级：引入 CSS 变量体系（`--color-*`、`--shadow-*`、`--radius-*`、`--transition-*`），统一配色、阴影、圆角与过渡动画。
+- 顶部导航栏美化：使用 `backdrop-filter` 毛玻璃效果 + 顶部渐变品牌装饰条；品牌 Logo 渐变文字；登录入口改为头像/Dropdown 下拉式交互。
+- 左侧项目面板升级：项目卡片悬停 `translateX` 微动效 + 选中态渐变背景；分类标题增加角色图标（👑 负责 / 👥 参与）和子分类图标（⚡ 进行中等）；空态使用自定义引导图文。
+- 流程画布美化：连线从直线升级为贝塞尔曲线（`<path>` + cubic bezier）；活跃连线添加 `stroke-dasharray` 流动动画；网格背景降低对比度；编辑/执行工具栏分隔符 + 圆角标签更像专业画布工具。
+- 节点卡片增强：`::before` 左侧状态色条指示器；拖拽中增加 `real-flow-node--dragging` 状态（放大 + 阴影增强 + 层级提升）；悬停 `translateY(-1px)` 浮起效果；状态 Emoji 前缀图标。
+- 右侧详情面板优化：`slideInRight` 动画 + 左侧阴影；输出物缺失项改为渐变红色卡片 + 左侧色条（`artifact-item-missing`）；已绑定项改为渐变绿色卡片；操作按钮组统一 `action-btn-group` 样式。
+- 门禁结果面板重做：通过/失败/检查中使用不同渐变背景 CSS 类（`gate-result-pass`/`gate-result-fail`/`gate-result-checking`），视觉差异更大。
+- 交互体验优化：骨架屏 loading 更像真实布局；空态增加图标 + 引导文字；完成态增加 `popIn` 弹出动画；全局滚动条美化；响应式 `@media` 小屏面板折叠。
+- 主题色升级：Ant Design theme token 从 `#1677ff` 调整为 `#4f46e5`（Indigo 系），与新配色体系协调。
+- 登录弹窗美化：渐变 header 背景 + 圆角增大 + 带图标输入框。
+- 未更改任何后端 API 调用逻辑、数据结构和路由结构。
+- 完成交接：to_qa（回归验证视觉改动不影响功能）、to_docs（如有用户可见变更需更新文档）。
 - 新增 API 类型：`ProjectProgress`、`ProjectListItem`；新增 `getMyProjects()` 接口函数。
 - AppLayout 改造：Content 区域移除 maxWidth/padding 限制，改为 flex:1 + overflow:hidden 以支持全屏三栏。
 - CSS 全面重写：新增三栏布局、项目列表面板、节点详情面板、全屏画布容器、工具栏样式。

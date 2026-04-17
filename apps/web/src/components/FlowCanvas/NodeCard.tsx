@@ -7,44 +7,59 @@ import {
   PlayCircleOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import type { ExecutionStatus, NodeExecution, NodeConfig } from '../../api/types';
 
 const { Text } = Typography;
 
-/** 状态对应的显示配置 */
+/** 优先级色点颜色映射 */
+const PRIORITY_DOT_COLOR: Record<string, string> = {
+  LOW: '#94a3b8',
+  MEDIUM: '#3b82f6',
+  HIGH: '#f97316',
+  URGENT: '#ef4444',
+};
+
+/** 状态对应的显示配置 —— 升级配色 */
 const STATUS_CONFIG: Record<
   ExecutionStatus,
-  { label: string; color: string; icon: React.ReactNode }
+  { label: string; color: string; icon: React.ReactNode; bgGradient: string }
 > = {
   PENDING: {
     label: '待启动',
-    color: '#8c8c8c',
+    color: '#94a3b8',
     icon: <ClockCircleOutlined />,
+    bgGradient: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
   },
   READY: {
     label: '可开始',
-    color: '#1677ff',
+    color: '#4f46e5',
     icon: <PlayCircleOutlined />,
+    bgGradient: 'linear-gradient(135deg, #eef2ff, #e0e7ff)',
   },
   IN_PROGRESS: {
     label: '进行中',
-    color: '#fa8c16',
+    color: '#f59e0b',
     icon: <SyncOutlined spin />,
+    bgGradient: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
   },
   GATE_CHECKING: {
     label: '门禁检查中',
-    color: '#722ed1',
+    color: '#8b5cf6',
     icon: <LoadingOutlined />,
+    bgGradient: 'linear-gradient(135deg, #f5f3ff, #ede9fe)',
   },
   COMPLETED: {
     label: '已完成',
-    color: '#52c41a',
+    color: '#10b981',
     icon: <CheckCircleOutlined />,
+    bgGradient: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
   },
   NEEDS_FIX: {
     label: '待补齐',
-    color: '#ff4d4f',
+    color: '#ef4444',
     icon: <ExclamationCircleOutlined />,
+    bgGradient: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
   },
 };
 
@@ -84,23 +99,39 @@ export default function NodeCard({
     >
       <Card
         hoverable={execution.status !== 'PENDING'}
-        className={`node-card-${execution.status}`}
+        className={`flow-node-card node-card-${execution.status}`}
         style={{
-          width: 160,
-          minWidth: 160,
+          width: 168,
+          minWidth: 168,
           cursor: execution.status === 'PENDING' ? 'not-allowed' : 'pointer',
           borderWidth: 2,
-          borderRadius: 10,
-          transition: 'all 0.2s',
-          boxShadow: highlighted ? `0 0 0 3px ${cfg.color}33` : undefined,
+          borderRadius: 'var(--radius-md)',
+          transition: 'all var(--transition-normal)',
+          boxShadow: highlighted ? `0 0 0 3px ${cfg.color}22, var(--shadow-md)` : 'var(--shadow-sm)',
+          background: cfg.bgGradient,
         }}
-        bodyStyle={{ padding: '12px 14px' }}
+        styles={{ body: { padding: '12px 14px' } }}
         onClick={() => {
           if (execution.status !== 'PENDING') onClick();
         }}
       >
-        {/* 状态角标 */}
+        {/* 状态角标 + 优先级色点 */}
         <div className="flex justify-between items-center mb-2">
+          {/* 优先级色点（左上角） */}
+          {nodeConfig?.priority && (
+            <span
+              title={`优先级: ${nodeConfig.priority}`}
+              style={{
+                display: 'inline-block',
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: PRIORITY_DOT_COLOR[nodeConfig.priority] ?? '#94a3b8',
+                marginRight: 6,
+                flexShrink: 0,
+              }}
+            />
+          )}
           <Badge
             color={cfg.color}
             text={
@@ -130,19 +161,45 @@ export default function NodeCard({
                   ? 'error'
                   : 'default'
               }
-              style={{ fontSize: 11, margin: 0 }}
+              style={{ fontSize: 11, margin: 0, borderRadius: 6 }}
             >
               需要 {requiredCount} 份文档
             </Tag>
           </div>
         )}
 
-        {/* READY 状态快捷按钮提示 */}
+        {/* 执行人摘要（显示首个执行人 + 剩余数量） */}
+        {nodeConfig?.assignees && nodeConfig.assignees.length > 0 && (
+          <div style={{ marginTop: 4 }}>
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              👤 {nodeConfig.assignees[0]}
+              {nodeConfig.assignees.length > 1 && ` +${nodeConfig.assignees.length - 1}`}
+            </Text>
+          </div>
+        )}
+
+        {/* 截止日期（底部小字） */}
+        {nodeConfig?.dueDate && (
+          <div style={{ marginTop: 4 }}>
+            <Text type="secondary" style={{ fontSize: 10 }}>
+              ⏰ 截止 {dayjs(nodeConfig.dueDate).format('MM-DD')}
+            </Text>
+          </div>
+        )}
+
+        {/* READY 状态快捷按钮 */}
         {execution.status === 'READY' && (
           <Button
             size="small"
             type="primary"
-            style={{ marginTop: 8, width: '100%', fontSize: 12 }}
+            style={{
+              marginTop: 8,
+              width: '100%',
+              fontSize: 12,
+              borderRadius: 'var(--radius-sm)',
+              fontWeight: 500,
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.2)',
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onClick();
@@ -155,7 +212,13 @@ export default function NodeCard({
           <Button
             size="small"
             danger
-            style={{ marginTop: 8, width: '100%', fontSize: 12 }}
+            style={{
+              marginTop: 8,
+              width: '100%',
+              fontSize: 12,
+              borderRadius: 'var(--radius-sm)',
+              fontWeight: 500,
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onClick();
