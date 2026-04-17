@@ -7,9 +7,10 @@ import {
   Input,
   message,
   Modal,
-  Segmented,
   Space,
+  Switch,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import {
@@ -72,13 +73,13 @@ interface FlowCanvasProps {
   executions: NodeExecution[];
   selectedExecutionId?: string;
   mode?: 'view' | 'edit';
-  saving?: boolean;
-  onSaveDraft?: (dto: UpdateFlowDraftDto) => void;
-  onNodeClick: (execution: NodeExecution) => void;
-  /** 是否允许切换模式（仅 OWNER） */
+  /** 是否允许切换编辑模式（仅 OWNER） */
   canSwitchMode?: boolean;
   /** 模式切换回调 */
   onModeChange?: (mode: 'view' | 'edit') => void;
+  saving?: boolean;
+  onSaveDraft?: (dto: UpdateFlowDraftDto) => void;
+  onNodeClick: (execution: NodeExecution) => void;
   /** 刷新回调 */
   onRefresh?: () => void;
 }
@@ -232,11 +233,11 @@ export default function FlowCanvas({
   executions,
   selectedExecutionId,
   mode = 'view',
+  canSwitchMode = false,
+  onModeChange,
   saving,
   onSaveDraft,
   onNodeClick,
-  canSwitchMode,
-  onModeChange,
   onRefresh,
 }: FlowCanvasProps) {
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -893,40 +894,40 @@ export default function FlowCanvas({
 
   return (
     <div className="flow-canvas-wrapper">
-      {/* ─── 统一工具栏：模式切换（左侧固定）+ 操作按钮（右侧按模式切换） ─── */}
+      {/* ─── 统一底部操作区：模式切换 + 编辑按钮（与删除/连线同区） ─── */}
       <div className={`flow-canvas-toolbar ${canEdit ? 'flow-canvas-toolbar--edit' : 'flow-canvas-toolbar--view'}`}>
-        {/* 左侧固定区域：模式切换 + 刷新 */}
-        <div className="flow-canvas-toolbar-mode">
-          {canSwitchMode && onModeChange && (
-            <Segmented
-              size="small"
-              value={mode}
-              options={[
-                { label: '执行模式', value: 'view' },
-                { label: '编辑模式', value: 'edit' },
-              ]}
-              onChange={(v) => onModeChange(v as 'view' | 'edit')}
-            />
-          )}
-          {onRefresh && (
-            <Text
-              style={{ fontSize: 12, cursor: 'pointer', color: 'var(--color-primary)', fontWeight: 500 }}
-              onClick={onRefresh}
-            >
-              <ReloadOutlined /> 刷新
+        <div className="flow-canvas-toolbar-left" key={mode}>
+          <div className="flow-canvas-toolbar-mode">
+            <Text style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              编辑模式
             </Text>
+            <Tooltip
+              title={canSwitchMode ? '仅在编辑需求时开启' : '仅项目负责人可切换编辑模式'}
+              placement="top"
+            >
+              <Switch
+                size="small"
+                checked={canEdit}
+                disabled={!canSwitchMode || !onModeChange}
+                onChange={(checked) => onModeChange?.(checked ? 'edit' : 'view')}
+              />
+            </Tooltip>
+          </div>
+
+          {onRefresh && (
+            <Button
+              type="text"
+              size="small"
+              icon={<ReloadOutlined />}
+              onClick={onRefresh}
+              style={{ borderRadius: 'var(--radius-sm)' }}
+            >
+              刷新
+            </Button>
           )}
-        </div>
 
-        <Divider type="vertical" style={{ margin: '0 8px', height: 24 }} />
-
-        {/* 右侧：按模式动态切换的操作区 + 提示文字，带过渡动画 */}
-        <div
-          key={mode}
-          className="flow-canvas-toolbar-actions"
-        >
-          {canEdit ? (
-            <Space size={8} wrap>
+          {canEdit && (
+            <>
               <Button
                 size="small"
                 icon={<DeleteOutlined />}
@@ -960,7 +961,6 @@ export default function FlowCanvas({
               >
                 保存草稿
               </Button>
-              {/* 仅当流程中尚无终止节点时显示 */}
               {!hasEndNode && nodes.length > 0 && (
                 <Button
                   size="small"
@@ -971,16 +971,16 @@ export default function FlowCanvas({
                   添加终止节点
                 </Button>
               )}
-              {connectFromNodeId && (
-                <Tag color="warning" style={{ borderRadius: 'var(--radius-sm)' }}>
-                  请点击目标节点完成连线
-                </Tag>
-              )}
-            </Space>
-          ) : null}
+            </>
+          )}
+
+          {connectFromNodeId && (
+            <Tag color="warning" style={{ borderRadius: 'var(--radius-sm)' }}>
+              请点击目标节点完成连线
+            </Tag>
+          )}
         </div>
 
-        {/* 最右侧：轻量操作提示 */}
         <Text className="flow-canvas-toolbar-hint" type="secondary">
           {canEdit
             ? '双击空白处新增 · 拖拽移动 · 点击后连线'

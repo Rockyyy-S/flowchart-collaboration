@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import {
   Button,
   Collapse,
-  Empty,
   Form,
   Input,
   Modal,
@@ -328,8 +327,8 @@ export default function ProjectListPanel({
     ];
 
     const icon = keyPrefix === 'owned'
-      ? <CrownOutlined style={{ fontSize: 12, color: 'var(--color-warning)' }} />
-      : <TeamOutlined style={{ fontSize: 12, color: 'var(--color-info)' }} />;
+      ? <CrownOutlined style={{ fontSize: 16, color: 'var(--color-warning)' }} />
+      : <TeamOutlined style={{ fontSize: 16, color: 'var(--color-info)' }} />;
 
     return (
       <div style={{ marginBottom: 8 }}>
@@ -365,32 +364,29 @@ export default function ProjectListPanel({
 
   return (
     <div className="project-list-panel">
-      {/* 顶部操作栏 */}
+      {/* 顶部操作区：新建 / 快速体验 + 折叠按钮 */}
       <div className="project-list-panel__header">
-        <Space size={6} style={{ flex: 1 }}>
-          <Button
-            size="small"
-            type="primary"
-            icon={<PlusOutlined />}
-            disabled={creating}
-            onClick={() => setCreateModalOpen(true)}
-            style={{ borderRadius: 'var(--radius-sm)', fontWeight: 500 }}
-          >
-            新建
-          </Button>
-          <Button
-            size="small"
-            icon={<RocketOutlined />}
-            loading={creating}
-            onClick={handleCreateDemo}
-            style={{ borderRadius: 'var(--radius-sm)' }}
-          >
-            快速体验
-          </Button>
-        </Space>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          disabled={creating}
+          onClick={() => setCreateModalOpen(true)}
+          style={{ borderRadius: 'var(--radius-sm)', fontWeight: 500, flex: 1 }}
+        >
+          新建
+        </Button>
+        <Button
+          icon={<RocketOutlined />}
+          loading={creating}
+          onClick={handleCreateDemo}
+          style={{ borderRadius: 'var(--radius-sm)', flex: 1 }}
+        >
+          快速体验
+        </Button>
         <Button
           type="text"
           size="small"
+          className="project-list-panel__collapse-btn"
           icon={<DoubleLeftOutlined />}
           onClick={onToggleCollapse}
         />

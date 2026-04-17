@@ -1,6 +1,6 @@
 # flowchart-collaboration Context Doc
 
-> 版本：v2.5 | 日期：2026-04-17 | 负责角色：前端专家 | 状态：已完成 FlowCanvas 拖拽竞态回归测试补强：补齐 vitest/jsdom 最小测试基建，并新增 END 节点拖拽压力用例覆盖 mouseup 后残余 mousemove 场景。
+> 版本：v2.7 | 日期：2026-04-17 | 负责角色：前端专家 | 状态：已完成画布底部操作区迁移：将模式开关文案统一为“编辑模式”，并将模式切换与“删除/连线/保存”等编辑操作合并到 FlowCanvas 底部同一区域；同步移除左栏重复入口并修正折叠按钮右侧居中对齐。
 
 ## 元信息
 
@@ -132,6 +132,25 @@
 - 新增 `apps/web/src/test/setup.ts`：补齐 `matchMedia` 与 `ResizeObserver` 的 jsdom 兼容 mock，降低组件测试环境差异。
 - 新增回归用例 `apps/web/src/components/FlowCanvas/index.test.tsx`：在编辑模式下模拟 END 节点“连续 mousemove + mouseup + 后续 mousemove”的压力序列，断言交互不抛异常且 END 节点仍在文档中，覆盖拖拽竞态回归场景。
 
+### 前端（2026-04-17 项目面板底部操作区改造）
+
+- 按需求将项目侧栏操作统一下沉到 `ProjectListPanel` 底部：`新建`、`快速体验`、`开启编辑模式` 同区展示，顶部仅保留折叠按钮，操作入口更稳定且符合单手操作路径。
+- 将模式切换从 `FlowCanvas` 工具栏 `Segmented` 改为单开关 `Switch`，文案固定为“开启编辑模式”，并通过 `MainWorkspace` 统一驱动画布 `view/edit` 状态。
+- 保持既有权限约束：非 OWNER 仍不可切换编辑态（开关可见但禁用，提示“仅项目负责人可切换编辑模式”），未改动后端 API 与鉴权链路。
+- 同步样式增强：新增侧栏底部操作区样式（分组按钮 + 开关行），并在小屏下将项目面板改为左侧悬浮抽屉式宽面板，避免底部操作区被压缩导致不可用。
+- 清理 FlowCanvas 冗余模式控件：移除内部模式切换 UI，仅保留刷新与编辑操作按钮，避免同一能力出现多入口造成认知冲突。
+
+### 前端（2026-04-17 模式切换与操作区位置修正）
+
+- 文案统一：将模式开关文案从“开启编辑模式”调整为“编辑模式”，减少动作导向措辞，和执行态语义更对齐。
+- 操作区迁移：在 `FlowCanvas` 实现画布底部统一操作区，将“编辑模式开关 + 删除 + 连线 + 保存草稿 + 添加终止节点 + 刷新”合并同区展示，确保位于画布区域最下方。
+- 入口收敛：从 `ProjectListPanel` 移除模式开关，避免左栏与画布双入口造成认知冲突。
+- 侧栏按钮对齐：将左侧项目栏折叠按钮调整到头部最右侧并保持垂直居中，修正视觉偏移。
+- 权限约束保持不变：非 OWNER 用户仍可见但不可用模式开关（提示“仅项目负责人可切换编辑模式”），未修改后端 API。
+- 最小验证：对 `FlowCanvas`、`ProjectListPanel`、`MainWorkspace` 三个 TS 文件执行诊断检查，结果均为零报错。
+- 涉及文件：`apps/web/src/components/FlowCanvas/index.tsx`、`apps/web/src/components/ProjectListPanel/index.tsx`、`apps/web/src/pages/MainWorkspace.tsx`、`apps/web/src/index.css`。
+- 完成交接：to_qa（回归验证底部操作区位置、模式切换权限、左栏折叠按钮对齐与交互一致性）。
+
 ### 前端（2026-04-16 流程画布核心功能增强）
 
 - 子流程按钮与并行分支：编辑模式下 TASK 节点（矩形及多人圆形）hover 时右侧显示"+"按钮（22px 圆形），点击弹出 Dropdown 菜单可选"向上/向下添加子流程"；子流程节点自动创建在主流程节点左侧偏移 -250px 位置并自动建立连线关系。
@@ -224,3 +243,5 @@
 | 2026-04-16 | v2.3 | 前端专家 | 完成三栏布局改造：全屏画布+左侧项目列表+右侧节点详情面板；新增 ProjectListPanel/NodeDetailPanel/MainWorkspace 组件；FlowCanvas 支持平移和双击新增节点；路由简化为单页面；编辑模式 OWNER 限定。 | 交接 to_qa / to_docs |
 | 2026-04-17 | v2.4 | 前端专家 | 修复 FlowCanvas 拖拽终止节点空指针异常：在 handleMouseMove 内对 draggingRef 做局部快照，移除 setNodes 回调中的非空断言读取，避免 mouseup 后异步回调报错。 | 交接 to_qa |
 | 2026-04-17 | v2.5 | 前端专家 | 补齐前端 vitest/jsdom 最小测试基建，并新增 FlowCanvas END 节点拖拽压力回归用例，覆盖“mouseup 清空 ref 后仍有 mousemove”竞态场景，验证组件不崩溃。 | 交接 to_qa |
+| 2026-04-17 | v2.6 | 前端专家 | 完成项目面板底部操作区改造：将“新建/快速体验/模式切换”统一下沉到 ProjectListPanel 底部；模式切换改为单开关“开启编辑模式”；FlowCanvas 移除 Segmented 模式入口并保持 OWNER 权限约束联动。 | 交接 to_qa |
+| 2026-04-17 | v2.7 | 前端专家 | 完成模式切换与操作区位置修正：模式文案改为“编辑模式”；模式开关迁移到 FlowCanvas 底部并与删除/连线同区；移除左栏重复开关并将折叠按钮调整到头部最右侧垂直居中；TS 诊断无新增报错。 | 交接 to_qa |

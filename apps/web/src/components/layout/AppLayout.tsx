@@ -22,6 +22,15 @@ import {
 
 const { Header, Content } = Layout;
 
+/* 产品 Slogan 轮播列表，每 5 秒切换一条 */
+const SLOGANS = [
+  '用流程约束，让交付可追溯',
+  '每个节点，都是一次承诺',
+  '流程驱动协作，文档守护质量',
+  '从想法到交付，每步有迹可循',
+  '让团队对齐，在每个关键节点',
+];
+
 /**
  * 全局应用布局
  * - 顶部毛玻璃导航栏（品牌渐变条 + 用户头像入口）
@@ -32,6 +41,22 @@ export default function AppLayout() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [issuingToken, setIssuingToken] = useState(false);
   const [form] = Form.useForm<{ userId: string }>();
+
+  /* Slogan 轮播状态 */
+  const [sloganIdx, setSloganIdx] = useState(0);
+  const [sloganVisible, setSloganVisible] = useState(true);
+
+  useEffect(() => {
+    // 每 5 秒：先淡出（0.4s）再切换文字再淡入
+    const timer = setInterval(() => {
+      setSloganVisible(false);
+      setTimeout(() => {
+        setSloganIdx((prev) => (prev + 1) % SLOGANS.length);
+        setSloganVisible(true);
+      }, 400);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     return subscribeTokenChange(() => {
@@ -78,6 +103,11 @@ export default function AppLayout() {
           <ApartmentOutlined className="app-brand__icon" />
           <span className="app-brand__text">Flowkit</span>
         </Link>
+
+        {/* 居中 Slogan 轮播 */}
+        <div className="app-header-slogan" style={{ opacity: sloganVisible ? 1 : 0 }}>
+          {SLOGANS[sloganIdx]}
+        </div>
 
         {/* 右侧用户区域 */}
         <div style={{ marginLeft: 'auto' }}>

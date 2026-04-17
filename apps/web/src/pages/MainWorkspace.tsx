@@ -100,9 +100,8 @@ export default function MainWorkspace() {
     setSelectedExecution(execution);
   }
 
-  /** 切换画布模式 */
-  function handleModeChange(value: string | number) {
-    const mode = value === 'edit' ? 'edit' : 'view';
+  /** 切换画布模式（由左侧项目面板底部开关触发） */
+  function handleModeChange(mode: 'view' | 'edit') {
     setCanvasMode(mode);
     if (mode === 'edit') {
       setSelectedExecution(null);
@@ -208,11 +207,11 @@ export default function MainWorkspace() {
               executions={executions}
               selectedExecutionId={selectedExecution?.executionId}
               mode={canvasMode}
+              canSwitchMode={!!selectedProjectId && selectedProjectRole === 'OWNER'}
+              onModeChange={handleModeChange}
               saving={saveDraftMut.isPending}
               onSaveDraft={(dto) => saveDraftMut.mutate(dto)}
               onNodeClick={handleNodeClick}
-              canSwitchMode={selectedProjectRole === 'OWNER'}
-              onModeChange={handleModeChange}
               onRefresh={handleRefresh}
             />
           </ErrorBoundary>
