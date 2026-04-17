@@ -1,5 +1,5 @@
 import { Alert, List, Tag, Typography } from 'antd';
-import { ExclamationCircleFilled, CheckCircleFilled, LoadingOutlined } from '@ant-design/icons';
+import { ExclamationCircleOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import type { GateResult } from '../../api/types';
 
 const { Text } = Typography;
@@ -37,7 +37,7 @@ export default function GateResultPanel({ gateResult, checking }: GateResultPane
       <Alert
         type="success"
         showIcon
-        icon={<CheckCircleFilled style={{ fontSize: 20 }} />}
+        icon={<CheckCircleOutlined style={{ fontSize: 20 }} />}
         message={<Text strong style={{ color: 'var(--color-success)' }}>门禁通过</Text>}
         description="所有必需输出物均已绑定，节点已完成。"
         className="gate-result-pass"
@@ -50,7 +50,7 @@ export default function GateResultPanel({ gateResult, checking }: GateResultPane
     <Alert
       type="error"
       showIcon
-      icon={<ExclamationCircleFilled style={{ fontSize: 20 }} />}
+      icon={<ExclamationCircleOutlined style={{ fontSize: 20 }} />}
       message={<Text strong style={{ color: 'var(--color-error)' }}>门禁未通过 — 缺少以下必需文档</Text>}
       description={
         <List
