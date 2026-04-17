@@ -1,6 +1,6 @@
 # flowchart-collaboration Context Doc
 
-> 版本：v2.3 | 日期：2026-04-16 | 负责角色：QA 专家 | 状态：已完成 UI 美化专项回归（v0.9）：未发现新增阻塞级缺陷；P1 孤立文件 BUG-20260416-01 + P2 × 2；QA 门禁因历史运行时联调证据缺失仍❌
+> 版本：v2.5 | 日期：2026-04-17 | 负责角色：前端专家 | 状态：已完成 FlowCanvas 拖拽竞态回归测试补强：补齐 vitest/jsdom 最小测试基建，并新增 END 节点拖拽压力用例覆盖 mouseup 后残余 mousemove 场景。
 
 ## 元信息
 
@@ -31,7 +31,7 @@
 |---|---|---|---|---|
 | 需求澄清 | ✅完成 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) | 2026-04-13 | PRD v1.0 已形成需求基线。 |
 | 架构边界 | ✅完成 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) | 2026-04-14 | v0.1 MVP 架构边界已冻结，可支持前后端并行开发。 |
-| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-16 | 已完成三栏布局改造 + UI 全面美化 + 多人节点圆形渲染与分叉连线 + 节点类型系统（START 椭圆 / END 同心圆 / TASK 矩形）：起始节点强制第一创建、终止节点工具栏快捷添加、保存门禁有效性验证、椭圆碰撞计算、节点删除保护。 |
+| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-17 | 已完成三栏布局改造 + UI 全面美化 + 多人节点圆形渲染与分叉连线 + 节点类型系统（START 椭圆 / END 同心圆 / TASK 矩形）；已修复拖拽终止节点空指针，并补充 vitest/jsdom 基建与拖拽压力回归用例。 |
 | 后端实现 | ✅完成 | [flowchart-collaboration-backend-summary](../implementation/flowchart-collaboration-backend-summary.md) | 2026-04-15 | 已补齐当前架构下可落地的中危整改：OWNER 审计查询、基础内存限流、submit 原子提交/失败回滚；JWT、项目级访问控制、上传安全与 DTO 校验继续保持。 |
 | QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) | 2026-04-16 | 已完成前端流程图编辑器专项回归 + UI 美化专项回归（v0.9）：本次美化改动未发现新增阻塞级缺陷（P1×1 孤立文件，P2×2 体验小问题）；但运行时联调证据仍未补齐，QA 门禁❌。 |
 | 安全审查 | ✅完成 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) | 2026-04-16 | 第三轮复审完成：VUL-10/11/12/13 全部关闭，安全门禁通过（v0.5）。 |
@@ -108,6 +108,30 @@
 - 操作提示文字移至工具栏最右侧、降低视觉权重（opacity 0.65 + 小字号），保留功能但不喧宾夺主。
 - 涉及文件：`apps/web/src/components/FlowCanvas/index.tsx`（工具栏 JSX 重构）、`apps/web/src/index.css`（新增 toolbar 子类样式与动画）。
 - 不改后端 API、不改 MainWorkspace 状态管理逻辑、不改 FlowCanvas props 接口、原有按钮功能完全保留。
+
+### 前端（2026-04-17 特殊节点形状样式修复）
+
+- 修复 CSS 缺失类名导致起始/终止/多人圆形节点渲染为普通矩形的问题。
+- 新增 `.real-flow-node--start` 样式：`border-radius: 50%` 椭圆形（160×72px）、绿色系渐变背景、flex 居中、隐藏左侧色条（`::before { display: none }`）。
+- 新增 `.real-flow-node--end` 样式：`border-radius: 50%` 圆形（80×80px）、红色系渐变背景、`box-shadow: inset` 同心圆效果、3px 边框、隐藏左侧色条。
+- 新增 `.real-flow-node--end-completed` 样式：完成态绿色系配色覆盖（边框 + 阴影 + 背景渐变）。
+- 新增 `.real-flow-node--circle` 样式：`border-radius: 50%` 圆形（100px）、flex 居中、隐藏左侧色条；状态色类在圆形节点上继续生效。
+- 涉及文件：`apps/web/src/index.css`（仅 CSS，未修改 TSX）。
+- 不改后端 API、不改 TSX 代码。
+
+### 前端（2026-04-17 拖拽终止节点空指针修复）
+
+- 修复 `FlowCanvas` 的拖拽竞态问题：`handleMouseMove` 进入拖拽分支时先快照 `draggingRef.current` 到局部常量（`dragState`），并解构出 `dragNodeId/offsetX/offsetY/nodeWidth/nodeHeight`。
+- `setNodes((prev) => prev.map(...))` 回调内不再访问 `draggingRef.current`，彻底移除 `draggingRef.current!.nodeId` 非空断言读取，避免 `mouseup` 清空 ref 后异步回调触发空指针。
+- 保持既有行为不变：节点拖拽移动、拖拽插入候选边检测、START/END 禁止插入规则均保持原逻辑。
+
+### 前端（2026-04-17 FlowCanvas 拖拽压力测试补强）
+
+- 新增最小测试基础设施：`apps/web/package.json` 增加 `test` 脚本与 `vitest/@testing-library/react/@testing-library/jest-dom/jsdom` 开发依赖。
+- 新增 Vite 测试配置：`apps/web/vite.config.ts` 增加 `test.environment = jsdom` 与 `setupFiles`，测试初始化入口指向 `src/test/setup.ts`。
+- 新增 `apps/web/src/test/setup.ts`：补齐 `matchMedia` 与 `ResizeObserver` 的 jsdom 兼容 mock，降低组件测试环境差异。
+- 新增回归用例 `apps/web/src/components/FlowCanvas/index.test.tsx`：在编辑模式下模拟 END 节点“连续 mousemove + mouseup + 后续 mousemove”的压力序列，断言交互不抛异常且 END 节点仍在文档中，覆盖拖拽竞态回归场景。
+
 ### 前端（2026-04-16 流程画布核心功能增强）
 
 - 子流程按钮与并行分支：编辑模式下 TASK 节点（矩形及多人圆形）hover 时右侧显示"+"按钮（22px 圆形），点击弹出 Dropdown 菜单可选"向上/向下添加子流程"；子流程节点自动创建在主流程节点左侧偏移 -250px 位置并自动建立连线关系。
@@ -115,6 +139,7 @@
 - 拖拽插入节点到两节点之间：拖拽节点时实时检测被拖拽节点中心与各条连线中点的距离（阈值 60px），命中时连线高亮（`flow-edge-insert-highlight`）并显示"释放插入"提示标签；释放时自动删除原边、创建两条新边并将被拖拽节点吸附到连线中点位置。
 - 新增 CSS 类：`.subprocess-add-btn`（子流程按钮样式与 hover 过渡）、`.flow-edge-insert-highlight`（拖拽插入连线高亮）、`.insert-hint-label`（释放插入浮动标签）。
 - TypeScript 零编译错误；不涉及后端 API 变更或 types.ts 接口修改。
+
 ### 前端（2026-04-16 节点类型系统）
 
 - 类型定义扩展：`GraphNode` 新增 `type?: NodeType`，`NodeConfig` 和 `UpdateFlowDraftDto` 新增 `nodeType?: NodeType`，导出 `NodeType = 'START' | 'END' | 'TASK'` 类型别名。
@@ -195,4 +220,7 @@
 | 2026-04-16 | v1.9 | 文档撰写员 | 同步第三轮安全复审与 QA 结论：安全门禁更新为✅通过（v0.5），发布门禁保留❌（仅阻塞运行时联调证据）；并更新阻塞记录口径。 | 回传项目总协调，用于发布申请重评估前的状态对齐 |
 | 2026-04-16 | v2.0 | 前端专家 | 完成前端真实可编辑流程画布改造：ProjectPage 新增执行/编辑双模式，支持新增/删除节点、拖拽、连线与保存草稿；回写前端阶段状态、实现摘要与风险解除记录。 | 交接 to_qa / to_security / to_docs |
 | 2026-04-16 | v2.1 | QA 专家 | 完成前端流程图编辑器专项回归：覆盖可视化画布、编辑能力、保存一致性、执行态抽屉兼容、前端类型检查；确认本次改动无新增阻塞级缺陷，项目整体阻塞项仍为历史遗留“运行时联调证据缺失”。 | 回传项目总协调，待补齐运行时联调证据后复核 QA 门禁 |
-| 2026-04-16 | v2.2 | 文档撰写员 | 同步前端“流程图编辑器已实现”文档：更新用户指南中的流程画布与编辑模式操作、修订已知限制为轻量真实画布口径，并修复前端实现总结新增节 Markdown 规范问题（表格分隔行空格、硬 tab/列表缩进）。 | 回传项目总协调，用于文档与当前代码一致性维护 || 2026-04-16 | v2.3 | 前端专家 | 完成三栏布局改造：全屏画布+左侧项目列表+右侧节点详情面板；新增 ProjectListPanel/NodeDetailPanel/MainWorkspace 组件；FlowCanvas 支持平移和双击新增节点；路由简化为单页面；编辑模式 OWNER 限定。 | 交接 to_qa / to_docs |
+| 2026-04-16 | v2.2 | 文档撰写员 | 同步前端“流程图编辑器已实现”文档：更新用户指南中的流程画布与编辑模式操作、修订已知限制为轻量真实画布口径，并修复前端实现总结新增节 Markdown 规范问题（表格分隔行空格、硬 tab/列表缩进）。 | 回传项目总协调，用于文档与当前代码一致性维护 |
+| 2026-04-16 | v2.3 | 前端专家 | 完成三栏布局改造：全屏画布+左侧项目列表+右侧节点详情面板；新增 ProjectListPanel/NodeDetailPanel/MainWorkspace 组件；FlowCanvas 支持平移和双击新增节点；路由简化为单页面；编辑模式 OWNER 限定。 | 交接 to_qa / to_docs |
+| 2026-04-17 | v2.4 | 前端专家 | 修复 FlowCanvas 拖拽终止节点空指针异常：在 handleMouseMove 内对 draggingRef 做局部快照，移除 setNodes 回调中的非空断言读取，避免 mouseup 后异步回调报错。 | 交接 to_qa |
+| 2026-04-17 | v2.5 | 前端专家 | 补齐前端 vitest/jsdom 最小测试基建，并新增 FlowCanvas END 节点拖拽压力回归用例，覆盖“mouseup 清空 ref 后仍有 mousemove”竞态场景，验证组件不崩溃。 | 交接 to_qa |

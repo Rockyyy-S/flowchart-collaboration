@@ -528,6 +528,63 @@ body,
   opacity: 0.92;
 }
 
+/* ========== 特殊形状节点 ========== */
+
+/* 起始节点（椭圆形 160×72） */
+.real-flow-node--start {
+  border-radius: 50% !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px 20px !important;
+  border-color: #10b981 !important;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+}
+.real-flow-node--start::before {
+  display: none !important;
+}
+
+/* 终止节点（圆形 80×80 + 同心圆效果） */
+.real-flow-node--end {
+  border-radius: 50% !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6px !important;
+  border-color: #ef4444 !important;
+  border-width: 3px !important;
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 5px #ef4444 !important;
+  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%) !important;
+}
+.real-flow-node--end::before {
+  display: none !important;
+}
+
+/* 终止节点 — 已完成状态 */
+.real-flow-node--end-completed {
+  border-color: #22c55e !important;
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 5px #22c55e !important;
+  background: linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%) !important;
+}
+
+/* 多人协作圆形节点（直径 100px） */
+.real-flow-node--circle {
+  border-radius: 50% !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 8px !important;
+}
+.real-flow-node--circle::before {
+  display: none !important;
+}
+
 /* 节点状态指示器（左侧色条） */
 .real-flow-node::before {
   content: '';

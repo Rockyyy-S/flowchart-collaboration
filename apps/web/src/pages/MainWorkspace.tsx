@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getExecutions } from '../api/executions';
 import { getCurrentFlow, updateFlowDraft } from '../api/flows';
 import { getAccessToken, subscribeTokenChange } from '../auth/token';
+import ErrorBoundary from '../components/ErrorBoundary';
 import FlowCanvas from '../components/FlowCanvas';
 import NodeDetailPanel from '../components/NodeDetailPanel';
 import ProjectListPanel from '../components/ProjectListPanel';
@@ -201,7 +202,7 @@ export default function MainWorkspace() {
             />
           </div>
         ) : flowDefinition ? (
-          <>
+          <ErrorBoundary resetKey={selectedProjectId ?? undefined}>
             <FlowCanvas
               flowDefinition={flowDefinition}
               executions={executions}
@@ -214,7 +215,7 @@ export default function MainWorkspace() {
               onModeChange={handleModeChange}
               onRefresh={handleRefresh}
             />
-          </>
+          </ErrorBoundary>
         ) : (
           <div className="main-workspace__empty">
             <Text type="secondary">暂无流程定义</Text>

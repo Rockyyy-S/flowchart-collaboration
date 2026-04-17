@@ -371,17 +371,27 @@ export default function FlowCanvas({
     function handleMouseMove(e: MouseEvent) {
       /* 优先处理节点拖拽 */
       if (draggingRef.current) {
+        /* 先快照拖拽状态，避免 mouseup 清空 ref 后异步回调读取空值 */
+        const dragState = draggingRef.current;
+        if (!dragState) return;
+        const {
+          nodeId: dragNodeId,
+          offsetX,
+          offsetY,
+          nodeWidth: dragW,
+          nodeHeight: dragH,
+        } = dragState;
         const container = canvasRef.current;
         if (!container) return;
         const rect = container.getBoundingClientRect();
         const currentPan = panOffsetRef.current;
         const logicX =
-          e.clientX - rect.left - currentPan.x - draggingRef.current.offsetX;
+          e.clientX - rect.left - currentPan.x - offsetX;
         const logicY =
-          e.clientY - rect.top - currentPan.y - draggingRef.current.offsetY;
+          e.clientY - rect.top - currentPan.y - offsetY;
         setNodes((prev) =>
           prev.map((node) =>
-            node.id === draggingRef.current!.nodeId
+            node.id === dragNodeId
               ? { ...node, x: Math.max(0, logicX), y: Math.max(0, logicY) }
               : node,
           ),
@@ -389,13 +399,18 @@ export default function FlowCanvas({
         setIsDirty(true);
 
         /* ── 拖拽插入检测：检查被拖拽节点是否靠近某条连线中点 ── */
-        const dragW = draggingRef.current.nodeWidth;
-        const dragH = draggingRef.current.nodeHeight;
         const dragCx = Math.max(0, logicX) + dragW / 2;
         const dragCy = Math.max(0, logicY) + dragH / 2;
-        const dragNodeId = draggingRef.current.nodeId;
         const currentNodes = nodesRef.current;
         const currentEdges = linkedEdgesRef.current;
+
+        /* 起始/终止节点不允许通过拖拽插入到边中间 */
+        const draggedNode = currentNodes.find((n) => n.id === dragNodeId);
+        if (draggedNode && (draggedNode.type === 'START' || draggedNode.type === 'END')) {
+          insertTargetEdgeRef.current = null;
+          setInsertTargetEdge(null);
+          return;
+        }
         let bestEdge: { source: string; target: string } | null = null;
         let bestDist = 60;
         for (const edge of currentEdges) {
@@ -438,6 +453,19 @@ export default function FlowCanvas({
         const dragNodeId = draggingRef.current.nodeId;
         const { source, target } = insertTargetEdgeRef.current;
         const currentNodes = nodesRef.current;
+
+        /* 起始/终止节点不允许插入到边中间，跳过插入逻辑 */
+        const draggedNode = currentNodes.find((n) => n.id === dragNodeId);
+        if (draggedNode && (draggedNode.type === 'START' || draggedNode.type === 'END')) {
+          insertTargetEdgeRef.current = null;
+          setInsertTargetEdge(null);
+          draggingRef.current = null;
+          panningRef.current = null;
+          setIsPanning(false);
+          setDraggingNodeId(null);
+          return;
+        }
+
         const srcNode = currentNodes.find((n) => n.id === source);
         const tgtNode = currentNodes.find((n) => n.id === target);
         if (srcNode && tgtNode) {
