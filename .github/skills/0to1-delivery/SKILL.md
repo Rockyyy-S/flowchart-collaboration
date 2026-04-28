@@ -132,9 +132,10 @@ context-doc: docs/context/{项目名}-context.md
 1. 读取 context-doc，了解初始状态
 2. 视为初始化已完成，跳过“启动阶段：项目画像”中的提问步骤
 3. 按 DoD 档位与策略模式确认激活角色清单（输出一次，无需等待确认）
-4. 立即开始编排，从第一个激活角色推进，直至 DoD 满足
-5. 每次角色交接时，在提示词中注入 context-doc 路径
-6. 全程无需等待用户确认，除非遇到无法自动解除的阻塞
+4. 若协作策略模式为“标准”，当需求命中以下关键词时默认激活 UX/UI设计师：原型、线框、交互、用户旅程、信息架构、可用性、界面规范、视觉规范、设计系统
+5. 立即开始编排，从第一个激活角色推进，直至 DoD 满足
+6. 每次角色交接时，在提示词中注入 context-doc 路径
+7. 全程无需等待用户确认，除非遇到无法自动解除的阻塞
 
 ```
 
@@ -171,10 +172,10 @@ context-doc: docs/context/{项目名}-context.md
 | 档位 | 激活角色 | 激活 Hooks | 需要 MCP |
 |-----|---------|-----------|---------|
 | **Mini** | 需求→架构→实现（可选前置：新业务拓展经理） | — | 否 |
-| **Standard** | Mini + QA + 文档（移动端项目可启用移动端开发专家/微信小程序开发专家） | quality-gate（PostToolUse） | 建议（QA执行） |
+| **Standard** | Mini + QA + 文档（移动端项目可启用移动端开发专家/微信小程序开发专家；命中 UX/UI 关键词默认激活 UX/UI设计师） | quality-gate（PostToolUse） | 建议（QA执行） |
 | **Full** | Standard + 安全 + 运维 + 发布（按开关可启用品牌设计师、可选前置：新业务拓展经理、移动端开发专家、微信小程序开发专家） | security-gate + quality-gate + completion-gate | 推荐（运维/发布执行） |
 
 **Hooks 说明：** Hooks 在 `.github/hooks/` 目录下预置，自动生效。无需在 Skill 中手动激活；只需知悉其拦截行为：
 - `security-gate.json`：阻止高危写操作（如 `rm -rf`、生产环境敏感写入）
-- `quality-gate.json`：校验每次写操作后的文件格式与结构
+- `quality-gate.json`：校验每次写操作后的文件格式与结构，并要求代码文件必须包含注释（复杂逻辑需补充详细注释）
 - `completion-gate.json`：在角色结束前确认 context doc 门禁状态已更新
