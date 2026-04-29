@@ -14,6 +14,8 @@ import { ExecutionsService } from './executions.service';
 import { StartExecutionDto } from './dto/start-execution.dto';
 import { SubmitExecutionDto } from './dto/submit-execution.dto';
 import { BindArtifactDto } from './dto/bind-artifact.dto';
+import { ApproveExecutionDto } from './dto/approve-execution.dto';
+import { RejectExecutionDto } from './dto/reject-execution.dto';
 import { ProjectAccessGuard } from '../common/guards/project-access.guard';
 import { ExecutionAccessGuard } from '../common/guards/execution-access.guard';
 import { RateLimit } from '../common/decorators/rate-limit.decorator';
@@ -51,7 +53,71 @@ export class ProjectExecutionsController {
       updatedAt: e.updatedAt,
     }));
   }
+
+  /**
+   * 下个节点参与者审核通过上个节点（流程继续推进）
+   * POST /api/v1/projects/:projectId/executions/:nodeId/approve
+   * Body: { nextNodeId: string }
+   * 权限：调用者必须是 nextNodeId 节点的 assignees 成员
+   */
+  @Post(':projectId/executions/:nodeId/approve')
+  @HttpCode(HttpStatus.OK)
+  approveNode(
+    @Param('projectId') projectId: string,
+    @Param('nodeId') nodeId: string,
+    @Body() dto: ApproveExecutionDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const actorId = req.user?.userId as string;
+    const requestId = req.requestId || 'unknown';
+    const { reviewed, next } = this.executionsService.approve(
+      projectId,
+      nodeId,
+      dto,
+      actorId,
+      requestId,
+    );
+    return {
+      reviewedNodeId: reviewed.nodeId,
+      reviewedStatus: reviewed.status,
+      reviewResult: reviewed.reviewResult,
+      nextNodeId: next.nodeId,
+      nextStatus: next.status,
+    };
+  }
+
+  /**
+   * 下个节点参与者拒绝上个节点（流程回退）
+   * POST /api/v1/projects/:projectId/executions/:nodeId/reject
+   * Body: { nextNodeId: string, reason: string }
+   * 权限：调用者必须是 nextNodeId 节点的 assignees 成员
+   */
+  @Post(':projectId/executions/:nodeId/reject')
+  @HttpCode(HttpStatus.OK)
+  rejectNode(
+    @Param('projectId') projectId: string,
+    @Param('nodeId') nodeId: string,
+    @Body() dto: RejectExecutionDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const actorId = req.user?.userId as string;
+    const requestId = req.requestId || 'unknown';
+    const rejected = this.executionsService.reject(
+      projectId,
+      nodeId,
+      dto,
+      actorId,
+      requestId,
+    );
+    return {
+      rejectedNodeId: rejected.nodeId,
+      status: rejected.status,
+      rejectionReason: rejected.rejectionReason,
+      reviewResult: rejected.reviewResult,
+    };
+  }
 }
+
 
 /** 执行实例动作接口 */
 @Controller('executions')

@@ -2,7 +2,9 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Body,
+  Param,
   Req,
   HttpCode,
   HttpStatus,
@@ -10,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { RateLimit } from '../common/decorators/rate-limit.decorator';
 import { MemoryRateLimitGuard } from '../common/guards/memory-rate-limit.guard';
+import { ProjectOwnerGuard } from '../common/guards/project-owner.guard';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
@@ -58,8 +61,26 @@ export class ProjectsController {
       workspaceId: project.workspaceId,
       name: project.name,
       status: project.status,
+      teamId: project.teamId,
       defaultFlowDefinitionId: flowDefinition.id,
       createdAt: project.createdAt,
     };
+  }
+
+  /**
+   * 删除项目（仅创建者/OWNER 可操作，级联删除所有关联数据）
+   * DELETE /api/v1/projects/:projectId
+   * Header: Authorization: Bearer <token>
+   */
+  @Delete(':projectId')
+  @UseGuards(ProjectOwnerGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  deleteProject(
+    @Param('projectId') projectId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const actorId = req.user?.userId as string;
+    const requestId = req.requestId || 'unknown';
+    this.projectsService.deleteProject(projectId, actorId, requestId);
   }
 }

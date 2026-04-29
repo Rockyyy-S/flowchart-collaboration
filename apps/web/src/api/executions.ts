@@ -65,3 +65,39 @@ export async function bindArtifact(
   );
   return res.data;
 }
+
+/**
+ * 审核通过上一节点产物，推进到下一节点
+ * @param projectId 项目 ID
+ * @param nodeId    上一节点（被审核的节点）ID
+ * @param nextNodeId 当前节点（审核者所在节点）ID
+ */
+export async function approveExecution(
+  projectId: string,
+  nodeId: string,
+  nextNodeId: string,
+): Promise<void> {
+  await apiClient.post(
+    `/projects/${projectId}/executions/${nodeId}/approve`,
+    { nextNodeId },
+  );
+}
+
+/**
+ * 拒绝上一节点产物，回退流程
+ * @param projectId 项目 ID
+ * @param nodeId    上一节点（被审核的节点）ID
+ * @param nextNodeId 当前节点（审核者所在节点）ID
+ * @param reason    拒绝理由（必填）
+ */
+export async function rejectExecution(
+  projectId: string,
+  nodeId: string,
+  nextNodeId: string,
+  reason: string,
+): Promise<void> {
+  await apiClient.post(
+    `/projects/${projectId}/executions/${nodeId}/reject`,
+    { nextNodeId, reason },
+  );
+}

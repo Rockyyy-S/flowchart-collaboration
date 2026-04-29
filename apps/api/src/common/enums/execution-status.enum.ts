@@ -11,10 +11,12 @@ export enum ExecutionStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   /** 门禁检查中：执行人已提交，系统正在校验输出物 */
   GATE_CHECKING = 'GATE_CHECKING',
-  /** 已完成：门禁通过（MVP 终态，回退需管理员创建修订任务） */
+  /** 已完成：门禁通过 */
   COMPLETED = 'COMPLETED',
   /** 待补齐：门禁失败，等待执行人补充输出物后重新提交 */
   NEEDS_FIX = 'NEEDS_FIX',
+  /** 被拒绝：下个节点参与者审核不通过，流程回退到当前节点 */
+  REJECTED = 'REJECTED',
 }
 
 /**
@@ -30,7 +32,10 @@ export const VALID_TRANSITIONS: Record<ExecutionStatus, ExecutionStatus[]> = {
     ExecutionStatus.NEEDS_FIX,
   ],
   [ExecutionStatus.NEEDS_FIX]: [ExecutionStatus.IN_PROGRESS],
-  [ExecutionStatus.COMPLETED]: [], // 终态
+  // 已完成 → 被拒绝（下个节点参与者审核不通过）
+  [ExecutionStatus.COMPLETED]: [ExecutionStatus.REJECTED],
+  // 被拒绝 → 重新进行（返工重做，类似 NEEDS_FIX 语义）
+  [ExecutionStatus.REJECTED]: [ExecutionStatus.IN_PROGRESS],
 };
 
 /** 判断状态迁移是否合法 */

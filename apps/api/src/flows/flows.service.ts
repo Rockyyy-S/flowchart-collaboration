@@ -83,26 +83,44 @@ export class FlowsService {
 
     const now = new Date();
 
-    const nodesConfig: NodeConfig[] = (dto.nodesConfig || []).map((nc) => ({
-      nodeId: nc.nodeId,
-      name: nc.name,
-      type: nc.type || 'NORMAL',
-      requiredArtifacts: (nc.requiredArtifacts || []).map(
-        (ar): ArtifactRequirement => ({
-          id: ar.id,
-          nodeId: nc.nodeId,
-          name: ar.name,
-          required: ar.required,
-          sourceType: ar.sourceType || 'DOCUMENT',
-        }),
-      ),
-      // 同步节点扩展配置字段
-      ...(nc.assignees ? { assignees: nc.assignees } : {}),
-      ...(nc.dueDate ? { dueDate: new Date(nc.dueDate) } : {}),
-      ...(nc.description ? { description: nc.description } : {}),
-      ...(nc.priority ? { priority: nc.priority } : {}),
-      ...(nc.estimatedHours !== undefined ? { estimatedHours: nc.estimatedHours } : {}),
-    }));
+    const nodesConfig: NodeConfig[] = (dto.nodesConfig || []).map((nc) => {
+      // 将 DTO 中的 type 字符串映射到合法的 NodeConfig 类型
+      // 兼容旧值（如 'NORMAL'）映射到 TASK_SIMPLE
+      const validTypes: NodeConfig['type'][] = [
+        'START',
+        'END',
+        'TASK_SIMPLE',
+        'TASK_BRANCH',
+      ];
+      const nodeType: NodeConfig['type'] = validTypes.includes(
+        nc.type as NodeConfig['type'],
+      )
+        ? (nc.type as NodeConfig['type'])
+        : 'TASK_SIMPLE';
+
+      return {
+        nodeId: nc.nodeId,
+        name: nc.name,
+        type: nodeType,
+        requiredArtifacts: (nc.requiredArtifacts || []).map(
+          (ar): ArtifactRequirement => ({
+            id: ar.id,
+            nodeId: nc.nodeId,
+            name: ar.name,
+            required: ar.required,
+            sourceType: ar.sourceType || 'DOCUMENT',
+          }),
+        ),
+        // 同步节点扩展配置字段
+        ...(nc.assignees ? { assignees: nc.assignees } : {}),
+        ...(nc.dueDate ? { dueDate: new Date(nc.dueDate) } : {}),
+        ...(nc.description ? { description: nc.description } : {}),
+        ...(nc.priority ? { priority: nc.priority } : {}),
+        ...(nc.estimatedHours !== undefined
+          ? { estimatedHours: nc.estimatedHours }
+          : {}),
+      };
+    });
 
     draft.graphJson = dto.graphJson;
     draft.nodesConfig = nodesConfig;

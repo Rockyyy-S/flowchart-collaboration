@@ -1,6 +1,6 @@
 # flowchart-collaboration Context Doc
 
-> 版本：v2.7 | 日期：2026-04-17 | 负责角色：前端专家 | 状态：已完成画布底部操作区迁移：将模式开关文案统一为“编辑模式”，并将模式切换与“删除/连线/保存”等编辑操作合并到 FlowCanvas 底部同一区域；同步移除左栏重复入口并修正折叠按钮右侧居中对齐。
+> 版本：v2.9 | 日期：2026-04-29 | 负责角色：前端专家 | 状态：前端全面改造完成（对接后端第二轮改造）：新增团队管理 Drawer（AppLayout 头部）、多标签流程图画布（MainWorkspace 重构）、NodeDetailPanel 三分区重构（节点信息/审核上一节点/当前节点操作）、ProjectListPanel 支持展开流程图列表 + 项目删除、API 层对接 Teams/Flowcharts/approve/reject 接口、REJECTED 状态完整支持、权限检查（仅参与者可打开节点面板），TypeScript 零错误。
 
 ## 元信息
 
@@ -31,8 +31,8 @@
 |---|---|---|---|---|
 | 需求澄清 | ✅完成 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) | 2026-04-13 | PRD v1.0 已形成需求基线。 |
 | 架构边界 | ✅完成 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) | 2026-04-14 | v0.1 MVP 架构边界已冻结，可支持前后端并行开发。 |
-| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-17 | 已完成三栏布局改造 + UI 全面美化 + 多人节点圆形渲染与分叉连线 + 节点类型系统（START 椭圆 / END 同心圆 / TASK 矩形）；已修复拖拽终止节点空指针，并补充 vitest/jsdom 基建与拖拽压力回归用例。 |
-| 后端实现 | ✅完成 | [flowchart-collaboration-backend-summary](../implementation/flowchart-collaboration-backend-summary.md) | 2026-04-15 | 已补齐当前架构下可落地的中危整改：OWNER 审计查询、基础内存限流、submit 原子提交/失败回滚；JWT、项目级访问控制、上传安全与 DTO 校验继续保持。 |
+| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-29 | **第二轮前端全面改造**（对接后端 v2.8 改造）：① 新增 TeamManagement Drawer（AppLayout 头部触发）；② MainWorkspace 重构为多标签模式（openedFlowcharts + Tabs）；③ NodeDetailPanel 改为三分区（节点信息 / 审核上一节点产物 / 当前节点操作），支持审核通过/拒绝及 REJECTED 状态 Alert；④ ProjectListPanel 支持展开项目查看流程图列表、删除项目（OWNER 权限）、创建项目时绑定团队（必填）+ 可选同步创建流程图；⑤ API 层新增 teams.ts、flowcharts.ts，executions.ts 新增 approve/reject，projects.ts 新增 deleteProject；⑥ 权限检查：仅 assignees 中的用户点击节点可打开面板；⑦ TypeScript 零错误。 |
+| 后端实现 | ✅完成 | [flowchart-collaboration-backend-summary](../implementation/flowchart-collaboration-backend-summary.md) | 2026-04-28 | 完成第二轮后端全面改造（依据《一些定义和逻辑描述.md》）：新增 TeamsModule（CRUD + 成员管理）、FlowchartsModule（含子流程图）；Project 实体新增 teamId 绑定；NodeConfig.type 规范化为联合类型；NodeExecution 新增 flowchartId/rejectionReason/reviewResult；ExecutionStatus 新增 REJECTED；新增审核/回退接口 approve/reject；ID 格式规范化（generateId 工具）；TypeScript 编译零错误。 |
 | QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) | 2026-04-16 | 已完成前端流程图编辑器专项回归 + UI 美化专项回归（v0.9）：本次美化改动未发现新增阻塞级缺陷（P1×1 孤立文件，P2×2 体验小问题）；但运行时联调证据仍未补齐，QA 门禁❌。 |
 | 安全审查 | ✅完成 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) | 2026-04-16 | 第三轮复审完成：VUL-10/11/12/13 全部关闭，安全门禁通过（v0.5）。 |
 | 文档沉淀 | ✅完成 | [flowchart-collaboration-context](flowchart-collaboration-context.md)、[quick-reference-guide](../quick-reference-guide.md)、[flowchart-collaboration-user-guide](../user-docs/flowchart-collaboration-user-guide.md)、[flowchart-collaboration-maintenance-runbook](../ops/flowchart-collaboration-maintenance-runbook.md) | 2026-04-14 | MVP 文档沉淀完成：用户操作指南 + 维护运维手册已落地；2026-04-16 已同步真实流程画布与编辑模式说明。 |
@@ -73,6 +73,7 @@
 | 2026-04-15 | QA 验证 | 关键运行时联调证据仍缺失：401/403、429、上传绑定与前端关键交互尚无真实执行留档。 | 按 README 与 QA 报告回归计划完成联调，并补充返回报文/截图/录屏证据。 | 未解除 |
 | 2026-04-15 | 发布准备 | 已完成发布准备文档与灰度演练记录（桌面推演），但 QA/安全门禁未通过，发布申请阻塞。 | 关闭 QA 与安全阻塞项并补齐证据后重新评估放行。 | 未解除 |
 | 2026-04-16 | QA 验证 | 运行时联调证据仍缺失，需在真实部署环境执行 README 中 curl 场景 A-F 并回填证据。 | 在真实部署环境补齐 A-F 场景回包与截图/录屏，更新 QA 报告后重提门禁。 | 未解除 |
+| 2026-04-28 | 后端实现 | 新增 Team/Flowchart 模块，Project 绑定 teamId，NodeConfig.type 规范化，新增 REJECTED 状态与审核/回退接口。TypeScript 编译零错误。 | 前端需同步更新 POST /projects 传 teamId、对接 teams/flowcharts 新接口、适配新 ExecutionStatus.REJECTED；由 QA 回归核心流程。 | 未解除（待前端对接） |
 
 ## 实现摘要
 
@@ -208,11 +209,17 @@
 - 新增审计查询能力：落地 `GET /api/v1/projects/:projectId/audit-logs`，支持 `resourceType/resourceId` 可选过滤；仅项目 OWNER 可访问，返回请求追踪与操作主体字段。
 - 新增基础限流：实现最小内存限流守卫并挂载到 `POST /auth/token`、`POST /projects`、`POST /projects/:projectId/documents`、`POST /executions/:executionId/start|submit|artifacts/bind`，超限返回 `429 RATE_LIMITED`。
 - 缓解 submit 一致性风险：`submit()` 改为“先计算/暂存，再统一提交”，若门禁、后继解锁、通知、审计任一步骤异常，则回滚 execution、后继节点更新和内存队列写入，避免 execution 长时间停留在 `GATE_CHECKING` 或出现半更新。
-### 后端（2026-04-16）
+### 后端（2026-04-28 第二轮全面改造）
 
-- 新增 `GET /api/v1/projects` 接口：返回当前已认证用户参与的所有项目列表，包含用户在项目中的角色（OWNER/MEMBER/VIEWER）及节点执行进度摘要（totalNodes/completedNodes/inProgressNodes）。
-- `ProjectsService` 新增 `findByUser(userId)` 方法：遍历 `store.projectMembers` 筛选用户参与项目，附带进度统计。
-- 该接口由全局 JwtAuthGuard 保护，未认证请求返回 401。- 更新最小可运行说明：`apps/api/README.md` 切换为 JWT 调用示例并补充 401/403 验证步骤。
+- **新增 TeamsModule**：完整 CRUD + 成员管理（`POST /api/v1/teams`、`GET /api/v1/teams`、`GET /api/v1/teams/:teamId`、`POST /api/v1/teams/:teamId/members`、`DELETE /api/v1/teams/:teamId/members/:memberId`、`DELETE /api/v1/teams/:teamId`）；仅创建者可增删成员/删除团队；全局 JwtAuthGuard 保护；写审计日志。
+- **新增 FlowchartsModule**：`Flowchart` 独立实体（含 parentFlowchartId/parentNodeId 支持子流程图）；接口：`GET /api/v1/projects/:projectId/flowcharts`、`POST /api/v1/projects/:projectId/flowcharts`、`POST /api/v1/flowcharts/:flowchartId/sub-flowcharts`、`DELETE /api/v1/flowcharts/:flowchartId`（级联删除后代子流程图）；写审计日志。
+- **Project 实体绑定团队**：`Project` 新增必填字段 `teamId`；`CreateProjectDto` 新增 `teamId`（必填）；创建项目前验证团队存在；`findByUser()` 改为优先通过用户所在团队查找项目，同时兼容旧 projectMembers 直接关联；新增 `DELETE /api/v1/projects/:projectId`（仅 OWNER 可操作，级联删除 NodeExecution/FlowDefinition/Flowchart/Member/ArtifactBinding/Document）。
+- **NodeConfig 类型规范化**：`type` 从 `string` 改为 `'START' | 'END' | 'TASK_SIMPLE' | 'TASK_BRANCH'`；`FlowsService` 兼容旧值（如 'NORMAL'）自动映射到 `TASK_SIMPLE`；新增 `subFlowchartIds?: string[]`（TASK_BRANCH 节点专用）。
+- **NodeExecution 数据结构扩展**：新增 `flowchartId?: string`、`rejectionReason?: string`、`reviewResult?: { reviewedBy, result, reason, reviewedAt }`。
+- **ExecutionStatus 新增 REJECTED**：`COMPLETED → REJECTED`（审核拒绝）、`REJECTED → IN_PROGRESS`（重新处理）合法迁移路径已加入 `VALID_TRANSITIONS`。
+- **审核/回退接口**：`POST /api/v1/projects/:projectId/executions/:nodeId/approve`（调用者需是 nextNodeId 的 assignees 成员）、`POST /api/v1/projects/:projectId/executions/:nodeId/reject`（必填 reason，流程回退）；权限不满足返回 403，状态不合法返回 400；写审计日志。
+- **ID 规范化工具**：新增 `generateId(prefix)` 工具函数（`apps/api/src/common/utils/generate-id.util.ts`）；Team/Project/Flowchart 均使用带前缀短码 ID。
+- **TypeScript 编译零错误**，不引入新 npm 依赖，不改动前端代码。
 
 ## 版本历史
 

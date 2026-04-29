@@ -11,6 +11,8 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+
+
 export class ProjectMemberDto {
   @IsString()
   @IsNotEmpty()
@@ -31,6 +33,11 @@ export class CreateProjectDto {
   @IsString()
   @MaxLength(500)
   description?: string;
+
+  /** 绑定的团队 ID（必填） */
+  @IsString()
+  @IsNotEmpty()
+  teamId: string;
 
   /** 初始成员列表（创建者自动注册为 OWNER，无需在此列出） */
   @IsOptional()

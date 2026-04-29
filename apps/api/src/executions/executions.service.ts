@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { StoreService } from '../shared/store.service';
@@ -17,6 +18,8 @@ import { ExecutionStatus } from '../common/enums/execution-status.enum';
 import { StartExecutionDto } from './dto/start-execution.dto';
 import { SubmitExecutionDto } from './dto/submit-execution.dto';
 import { BindArtifactDto } from './dto/bind-artifact.dto';
+import { ApproveExecutionDto } from './dto/approve-execution.dto';
+import { RejectExecutionDto } from './dto/reject-execution.dto';
 
 @Injectable()
 export class ExecutionsService {
@@ -443,5 +446,176 @@ export class ExecutionsService {
       checkedAt: new Date(gateResult.checkedAt),
       missingArtifacts: gateResult.missingArtifacts.map((item) => ({ ...item })),
     };
+  }
+
+  /**
+   * 按项目 ID + 节点 ID 查找执行实例（用于审核/回退操作）
+   */
+  findByProjectAndNodeId(
+    projectId: string,
+    nodeId: string,
+  ): NodeExecution | undefined {
+    return [...this.store.nodeExecutions.values()].find(
+      (e) => e.projectId === projectId && e.nodeId === nodeId,
+    );
+  }
+
+  /**
+   * 下个节点参与者审核通过上个节点产出物
+   * - 调用者必须是 nextNodeId 对应执行实例的 assignees 成员
+   * - 被审核节点（nodeId）状态需为 COMPLETED
+   * - 审核通过后，nextNodeId 的执行实例推进到 READY
+   * - 写审计日志
+   */
+  approve(
+    projectId: string,
+    nodeId: string,
+    dto: ApproveExecutionDto,
+    actorId: string,
+    requestId: string,
+  ): { reviewed: NodeExecution; next: NodeExecution } {
+    // 查找被审核节点的执行实例
+    const reviewedExecution = this.findByProjectAndNodeId(projectId, nodeId);
+    if (!reviewedExecution) {
+      throw new NotFoundException({
+        code: 'EXECUTION_NOT_FOUND',
+        message: `节点 ${nodeId} 在项目 ${projectId} 下不存在执行实例`,
+      });
+    }
+
+    if (reviewedExecution.status !== ExecutionStatus.COMPLETED) {
+      throw new BadRequestException({
+        code: 'INVALID_STATE_FOR_REVIEW',
+        message: `被审核节点状态需为 COMPLETED，当前状态：${reviewedExecution.status}`,
+      });
+    }
+
+    // 查找下个节点的执行实例
+    const nextExecution = this.findByProjectAndNodeId(projectId, dto.nextNodeId);
+    if (!nextExecution) {
+      throw new NotFoundException({
+        code: 'NEXT_EXECUTION_NOT_FOUND',
+        message: `下一节点 ${dto.nextNodeId} 在项目 ${projectId} 下不存在执行实例`,
+      });
+    }
+
+    // 权限校验：调用者必须是下一节点的 assignees 成员
+    if (!nextExecution.assignees.includes(actorId)) {
+      throw new ForbiddenException({
+        code: 'NOT_NEXT_NODE_ASSIGNEE',
+        message: '仅下一节点的参与者可审核上一节点',
+      });
+    }
+
+    const now = new Date();
+
+    // 在被审核节点写入审核结果
+    reviewedExecution.reviewResult = {
+      reviewedBy: actorId,
+      result: 'APPROVED',
+      reviewedAt: now,
+    };
+    reviewedExecution.updatedAt = now;
+    this.store.nodeExecutions.set(reviewedExecution.id, reviewedExecution);
+
+    // 推进下一节点到 READY（若当前为 PENDING）
+    if (nextExecution.status === ExecutionStatus.PENDING) {
+      nextExecution.status = ExecutionStatus.READY;
+      nextExecution.updatedAt = now;
+      this.store.nodeExecutions.set(nextExecution.id, nextExecution);
+    }
+
+    this.auditService.record({
+      projectId,
+      requestId,
+      actorId,
+      action: 'APPROVE_NODE',
+      resourceType: 'NodeExecution',
+      resourceId: reviewedExecution.id,
+      payload: {
+        reviewedNodeId: nodeId,
+        nextNodeId: dto.nextNodeId,
+      },
+    });
+
+    return { reviewed: reviewedExecution, next: nextExecution };
+  }
+
+  /**
+   * 下个节点参与者拒绝上个节点产出物（流程回退）
+   * - 调用者必须是 nextNodeId 对应执行实例的 assignees 成员
+   * - 被拒绝节点（nodeId）状态变为 REJECTED
+   * - 必须提供拒绝理由
+   * - 写审计日志
+   */
+  reject(
+    projectId: string,
+    nodeId: string,
+    dto: RejectExecutionDto,
+    actorId: string,
+    requestId: string,
+  ): NodeExecution {
+    // 查找被拒绝节点的执行实例
+    const rejectedExecution = this.findByProjectAndNodeId(projectId, nodeId);
+    if (!rejectedExecution) {
+      throw new NotFoundException({
+        code: 'EXECUTION_NOT_FOUND',
+        message: `节点 ${nodeId} 在项目 ${projectId} 下不存在执行实例`,
+      });
+    }
+
+    if (rejectedExecution.status !== ExecutionStatus.COMPLETED) {
+      throw new BadRequestException({
+        code: 'INVALID_STATE_FOR_REJECT',
+        message: `只能拒绝状态为 COMPLETED 的节点，当前状态：${rejectedExecution.status}`,
+      });
+    }
+
+    // 查找下个节点的执行实例（用于权限校验）
+    const nextExecution = this.findByProjectAndNodeId(projectId, dto.nextNodeId);
+    if (!nextExecution) {
+      throw new NotFoundException({
+        code: 'NEXT_EXECUTION_NOT_FOUND',
+        message: `下一节点 ${dto.nextNodeId} 在项目 ${projectId} 下不存在执行实例`,
+      });
+    }
+
+    // 权限校验：调用者必须是下一节点的 assignees 成员
+    if (!nextExecution.assignees.includes(actorId)) {
+      throw new ForbiddenException({
+        code: 'NOT_NEXT_NODE_ASSIGNEE',
+        message: '仅下一节点的参与者可拒绝上一节点',
+      });
+    }
+
+    const now = new Date();
+
+    // 将被拒绝节点状态变更为 REJECTED
+    rejectedExecution.status = ExecutionStatus.REJECTED;
+    rejectedExecution.rejectionReason = dto.reason;
+    rejectedExecution.reviewResult = {
+      reviewedBy: actorId,
+      result: 'REJECTED',
+      reason: dto.reason,
+      reviewedAt: now,
+    };
+    rejectedExecution.updatedAt = now;
+    this.store.nodeExecutions.set(rejectedExecution.id, rejectedExecution);
+
+    this.auditService.record({
+      projectId,
+      requestId,
+      actorId,
+      action: 'REJECT_NODE',
+      resourceType: 'NodeExecution',
+      resourceId: rejectedExecution.id,
+      payload: {
+        rejectedNodeId: nodeId,
+        nextNodeId: dto.nextNodeId,
+        reason: dto.reason,
+      },
+    });
+
+    return rejectedExecution;
   }
 }

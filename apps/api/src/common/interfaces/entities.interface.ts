@@ -1,5 +1,20 @@
 import { ExecutionStatus } from '../enums/execution-status.enum';
 
+/** 团队（多个成员组成，服务于流程图协作） */
+export interface Team {
+  /** 格式：team-{uuid前8位} */
+  id: string;
+  /** 团队名称 */
+  name: string;
+  /** 团队描述（可选） */
+  description?: string;
+  /** 创建人 ID */
+  creatorId: string;
+  /** 团队成员 ID 列表（包含创建人） */
+  memberIds: string[];
+  createdAt: Date;
+}
+
 /** 项目主聚合根 */
 export interface Project {
   id: string;
@@ -9,6 +24,8 @@ export interface Project {
   status: 'ACTIVE' | 'ARCHIVED';
   /** 项目工作空间 ID，用于文档隔离 */
   workspaceId: string;
+  /** 绑定的团队 ID（必填，一个项目只属于一个团队） */
+  teamId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,7 +53,14 @@ export interface ArtifactRequirement {
 export interface NodeConfig {
   nodeId: string;
   name: string;
-  type: string;
+  /**
+   * 节点类型：
+   * START         - 开始节点（椭圆形，标记流程图/项目开始）
+   * END           - 结束节点（同心圆，标记流程图/项目完成）
+   * TASK_SIMPLE   - 无分支任务节点（长方形，单人完成）
+   * TASK_BRANCH   - 有分支任务节点（长方形双列，多人协作，需子流程图）
+   */
+  type: 'START' | 'END' | 'TASK_SIMPLE' | 'TASK_BRANCH';
   requiredArtifacts: ArtifactRequirement[];
   /** 执行人列表（用户 ID） */
   assignees?: string[];
@@ -48,6 +72,45 @@ export interface NodeConfig {
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   /** 预估工时（小时） */
   estimatedHours?: number;
+  /** 有分支任务节点关联的子流程图 ID 列表（TASK_BRANCH 节点专用） */
+  subFlowchartIds?: string[];
+}
+
+/** 流程图元数据实体（独立于 FlowDefinition，支持子流程图关联） */
+export interface Flowchart {
+  /** 格式：flowchart-{uuid前8位} */
+  id: string;
+  /** 流程图名称 */
+  name: string;
+  /** 流程图描述 */
+  description?: string;
+  /** 所属项目 ID */
+  projectId: string;
+  /** 负责人用户 ID */
+  ownerId: string;
+  /** 父流程图 ID（子流程图必填；普通流程图为 undefined） */
+  parentFlowchartId?: string;
+  /** 产生该子流程图的父节点 ID（子流程图必填；普通流程图为 undefined） */
+  parentNodeId?: string;
+  /** 节点数量 */
+  nodeCount: number;
+  /**
+   * 流程图状态：
+   * 0 - 未开始
+   * 1 - 进行中
+   * 2 - 已完成
+   * 3 - 超过截止时间
+   */
+  status: 0 | 1 | 2 | 3;
+  createdAt: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  /** 截止时间 */
+  dueAt?: Date;
+  /** LogicFlow 兼容的图结构 JSON */
+  graphJson: Record<string, unknown>;
+  /** 节点静态配置列表 */
+  nodesConfig: NodeConfig[];
 }
 
 /** 流程定义（含草稿与已发布版本） */
@@ -78,6 +141,7 @@ export interface GateResult {
 
 /** 节点执行实例（运行态） */
 export interface NodeExecution {
+  /** 格式：node-{uuid前8位} */
   id: string;
   projectId: string;
   flowDefinitionId: string;
@@ -92,6 +156,17 @@ export interface NodeExecution {
   gateResult?: GateResult;
   /** 前置节点 nodeId 列表，用于自动解锁 PENDING 节点 */
   predecessorNodeIds: string[];
+  /** 所属流程图 ID（对应 Flowchart 实体，可选兼容历史数据） */
+  flowchartId?: string;
+  /** 被下个节点参与者拒绝时的拒绝理由 */
+  rejectionReason?: string;
+  /** 审核记录（下个节点参与者审核本节点产出时写入） */
+  reviewResult?: {
+    reviewedBy: string;
+    result: 'APPROVED' | 'REJECTED';
+    reason?: string;
+    reviewedAt: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

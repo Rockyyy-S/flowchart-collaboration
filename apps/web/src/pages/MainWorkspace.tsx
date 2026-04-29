@@ -1,5 +1,12 @@
+/**
+ * 主工作区页面（重构版）—— 三栏布局 + 多标签流程图
+ *
+ * 左侧：项目列表面板（240px，可折叠）——点击项目展开流程图列表，点击流程图打开标签
+ * 中间：画布区域 —— 顶部多标签 + 下方 FlowCanvas（按当前激活标签的 projectId 加载数据）
+ * 右侧：节点详情面板（360px，仅参与者点击节点时显示）
+ */
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Result, Skeleton, Space, Typography, message } from 'antd';
+import { Alert, Result, Skeleton, Space, Tabs, Typography, message } from 'antd';
 import {
   AppstoreOutlined,
   ExclamationCircleOutlined,
@@ -7,21 +14,27 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getExecutions } from '../api/executions';
 import { getCurrentFlow, updateFlowDraft } from '../api/flows';
-import { getAccessToken, subscribeTokenChange } from '../auth/token';
+import { getAccessToken, getTokenSnapshot, subscribeTokenChange } from '../auth/token';
 import ErrorBoundary from '../components/ErrorBoundary';
 import FlowCanvas from '../components/FlowCanvas';
 import NodeDetailPanel from '../components/NodeDetailPanel';
 import ProjectListPanel from '../components/ProjectListPanel';
+import type { OpenFlowchartInfo } from '../components/ProjectListPanel';
 import type { NodeExecution, UpdateFlowDraftDto } from '../api/types';
 
 const { Text } = Typography;
 
+/** 已打开的流程图标签信息 */
+interface OpenedFlowchart {
+  flowchartId: string;
+  projectId: string;
+  projectName: string;
+  flowchartName: string;
+  projectRole: 'OWNER' | 'MEMBER' | 'VIEWER';
+}
+
 /**
- * 主工作区页面 —— 三栏布局
- *
- * 左侧：项目列表面板（240px，可折叠）
- * 中间：全屏画布（铺满剩余空间）
- * 右侧：节点详情面板（360px，仅选中节点时显示）
+ * 主工作区页面 —— 三栏布局 + 多标签
  */
 export default function MainWorkspace() {
   const queryClient = useQueryClient();
@@ -35,9 +48,16 @@ export default function MainWorkspace() {
   /* ── 左侧面板状态 ── */
   const [leftCollapsed, setLeftCollapsed] = useState(false);
 
-  /* ── 当前选中项目 ── */
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
-  const [selectedProjectRole, setSelectedProjectRole] = useState<'OWNER' | 'MEMBER' | 'VIEWER'>('OWNER');
+  /* ── 多标签流程图状态 ── */
+  const [openedFlowcharts, setOpenedFlowcharts] = useState<OpenedFlowchart[]>([]);
+  const [activeTabKey, setActiveTabKey] = useState<string | null>(null);
+
+  /* 当前激活的标签 */
+  const activeTab = openedFlowcharts.find((t) => t.flowchartId === activeTabKey) ?? null;
+
+  /* 当前激活的项目 ID（兼容现有 query key） */
+  const selectedProjectId = activeTab?.projectId ?? null;
+  const selectedProjectRole = activeTab?.projectRole ?? 'OWNER';
 
   /* ── 画布模式 ── */
   const [canvasMode, setCanvasMode] = useState<'view' | 'edit'>('view');
@@ -86,26 +106,61 @@ export default function MainWorkspace() {
     queryClient.invalidateQueries({ queryKey: ['flow', selectedProjectId] });
   }
 
-  /** 选中项目 */
-  function handleSelectProject(projectId: string, role: 'OWNER' | 'MEMBER' | 'VIEWER', initialMode?: 'view' | 'edit') {
-    setSelectedProjectId(projectId);
-    setSelectedProjectRole(role);
-    /* 切换项目时关闭右侧面板并重置模式 */
+  /** 打开或激活流程图标签（从 ProjectListPanel 触发） */
+  function handleOpenFlowchart(info: OpenFlowchartInfo) {
+    const exists = openedFlowcharts.find((t) => t.flowchartId === info.flowchartId);
+    if (!exists) {
+      setOpenedFlowcharts((prev) => [
+        ...prev,
+        {
+          flowchartId: info.flowchartId,
+          projectId: info.projectId,
+          projectName: info.projectName,
+          flowchartName: info.flowchartName,
+          projectRole: info.projectRole,
+        },
+      ]);
+    }
+    setActiveTabKey(info.flowchartId);
+    /* 切换标签时关闭右侧面板并重置画布模式 */
     setSelectedExecution(null);
-    setCanvasMode(initialMode ?? 'view');
+    setCanvasMode('view');
   }
 
-  /** 点击画布节点 */
-  function handleNodeClick(execution: NodeExecution) {
-    setSelectedExecution(execution);
+  /** 关闭标签 */
+  function handleCloseTab(targetKey: string) {
+    const newTabs = openedFlowcharts.filter((t) => t.flowchartId !== targetKey);
+    setOpenedFlowcharts(newTabs);
+    /* 如果关闭的是当前激活标签，切换到最后一个 */
+    if (activeTabKey === targetKey) {
+      setActiveTabKey(newTabs.length > 0 ? newTabs[newTabs.length - 1].flowchartId : null);
+      setSelectedExecution(null);
+    }
   }
 
-  /** 切换画布模式（由左侧项目面板底部开关触发） */
+  /** 切换标签 */
+  function handleTabChange(key: string) {
+    setActiveTabKey(key);
+    setSelectedExecution(null);
+    setCanvasMode('view');
+  }
+
+  /** 切换画布模式 */
   function handleModeChange(mode: 'view' | 'edit') {
     setCanvasMode(mode);
     if (mode === 'edit') {
       setSelectedExecution(null);
     }
+  }
+
+  /** 点击画布节点 —— 仅当前节点参与者可打开面板 */
+  function handleNodeClick(execution: NodeExecution) {
+    const currentUserId = getTokenSnapshot()?.userId;
+    /* 非参与者不打开面板 */
+    if (!currentUserId || !execution.assignees.includes(currentUserId)) {
+      return;
+    }
+    setSelectedExecution(execution);
   }
 
   /* 执行列表刷新后同步右侧面板选中状态 */
@@ -139,12 +194,22 @@ export default function MainWorkspace() {
     [executions],
   );
 
+  /* 当前用户 ID */
+  const currentUserId = getTokenSnapshot()?.userId;
+
+  /* 构建标签 items */
+  const tabItems = openedFlowcharts.map((tab) => ({
+    key: tab.flowchartId,
+    label: `${tab.projectName}/${tab.flowchartName}`,
+    closable: true,
+  }));
+
   return (
     <div className="main-workspace">
       {/* ── 左侧项目列表面板 ── */}
       <ProjectListPanel
-        selectedProjectId={selectedProjectId}
-        onSelectProject={handleSelectProject}
+        activeFlowchartId={activeTabKey}
+        onOpenFlowchart={handleOpenFlowchart}
         collapsed={leftCollapsed}
         onToggleCollapse={() => setLeftCollapsed((prev) => !prev)}
       />
@@ -157,7 +222,7 @@ export default function MainWorkspace() {
             type="warning"
             showIcon
             banner
-            message="当前未登录，写操作会被拦截。请先在右上角点击「获取开发令牌」。"
+            message="当前未登录，写操作会被拦截。请先在右上角点击「登录」。"
             style={{ flexShrink: 0 }}
           />
         )}
@@ -174,15 +239,33 @@ export default function MainWorkspace() {
           />
         )}
 
-        {/* 未选择项目空态 —— 友好引导图文 */}
-        {!selectedProjectId ? (
+        {/* 多标签页 */}
+        {openedFlowcharts.length > 0 && (
+          <Tabs
+            type="editable-card"
+            hideAdd
+            activeKey={activeTabKey ?? undefined}
+            onChange={handleTabChange}
+            onEdit={(targetKey, action) => {
+              if (action === 'remove' && typeof targetKey === 'string') {
+                handleCloseTab(targetKey);
+              }
+            }}
+            items={tabItems}
+            style={{ flexShrink: 0, paddingTop: 4, borderBottom: '1px solid var(--color-border)' }}
+            size="small"
+          />
+        )}
+
+        {/* 未打开任何标签空态 */}
+        {openedFlowcharts.length === 0 ? (
           <div className="main-workspace__empty">
             <Result
               icon={<AppstoreOutlined style={{ fontSize: 64, color: 'var(--color-primary-light)', opacity: 0.6 }} />}
-              title={<span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>选择一个项目开始工作</span>}
+              title={<span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>选择一个流程图开始工作</span>}
               subTitle={
                 <span style={{ color: 'var(--color-text-secondary)', fontSize: 14 }}>
-                  从左侧面板选择已有项目，或点击「新建」/「快速体验」创建新项目
+                  从左侧面板选择项目，展开后点击流程图即可在此打开标签
                 </span>
               }
             />
@@ -234,6 +317,8 @@ export default function MainWorkspace() {
               : null
           }
           nodeConfig={selectedNodeConfig}
+          allExecutions={executions}
+          currentUserId={currentUserId}
           onClose={() => {
             setSelectedExecution(null);
             setTimeout(() => handleRefresh(), 300);

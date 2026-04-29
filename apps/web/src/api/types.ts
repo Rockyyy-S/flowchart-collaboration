@@ -8,7 +8,8 @@ export type ExecutionStatus =
   | 'IN_PROGRESS'   // 进行中
   | 'GATE_CHECKING' // 门禁检查中
   | 'COMPLETED'     // 已完成
-  | 'NEEDS_FIX';    // 待补齐
+  | 'NEEDS_FIX'     // 待补齐
+  | 'REJECTED';     // 被下一节点参与者回退
 
 /** 项目 */
 export interface Project {
@@ -41,6 +42,8 @@ export interface ProjectListItem {
   description?: string;
   status: string;
   role: 'OWNER' | 'MEMBER' | 'VIEWER';
+  /** 绑定的团队 ID（后端返回） */
+  teamId?: string;
   createdAt: string;
   updatedAt: string;
   progress: ProjectProgress;
@@ -75,8 +78,10 @@ export interface NodeConfig {
   type?: NodeType;
 }
 
-/** 节点类型枚举：起始 / 终止 / 普通任务 */
-export type NodeType = 'START' | 'END' | 'TASK';
+/** 节点类型枚举：起始 / 终止 / 无分支任务 / 有分支任务
+ * 保留 'TASK' 以兼容旧数据；新建节点使用 TASK_SIMPLE 或 TASK_BRANCH
+ */
+export type NodeType = 'START' | 'END' | 'TASK' | 'TASK_SIMPLE' | 'TASK_BRANCH';
 
 /** 流程图节点定义（graphJson 中） */
 export interface GraphNode {
@@ -132,6 +137,12 @@ export interface NodeExecution {
   startedAt?: string;
   completedAt?: string;
   updatedAt: string;
+  /** 所属流程图 ID（新增字段） */
+  flowchartId?: string;
+  /** 被回退时的理由（REJECTED 状态才有值） */
+  rejectionReason?: string;
+  /** 当前节点已绑定的产出物（后端聚合返回） */
+  artifacts?: ArtifactBinding[];
 }
 
 /** 节点执行实例（含门禁结果，用于提交响应） */
@@ -177,6 +188,38 @@ export interface ApiError {
   message: string;
   requestId: string;
   details?: unknown[];
+}
+
+/** 团队 */
+export interface Team {
+  /** 格式为 "team-xxx" */
+  id: string;
+  name: string;
+  description?: string;
+  creatorId: string;
+  memberIds: string[];
+  createdAt: string;
+}
+
+/** 流程图元数据 */
+export interface Flowchart {
+  /** 格式为 "flowchart-xxx" */
+  id: string;
+  name: string;
+  description?: string;
+  projectId: string;
+  ownerId: string;
+  /** 子流程图才有值：父流程图 ID */
+  parentFlowchartId?: string;
+  /** 子流程图才有值：父节点 ID */
+  parentNodeId?: string;
+  nodeCount: number;
+  /** 0=未开始 1=进行中 2=已完成 3=超过截止时间 */
+  status: 0 | 1 | 2 | 3;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  dueAt?: string;
 }
 
 /** 保存流程草稿请求体 */

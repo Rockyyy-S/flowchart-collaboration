@@ -11,8 +11,9 @@ import {
   Typography,
   message,
 } from 'antd';
-import { ApartmentOutlined, LogoutOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons';
+import { ApartmentOutlined, LogoutOutlined, SafetyOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { issueDevToken } from '../../api/auth';
+import TeamManagement from '../TeamManagement';
 import {
   clearTokenSnapshot,
   getTokenSnapshot,
@@ -39,6 +40,7 @@ const SLOGANS = [
 export default function AppLayout() {
   const [tokenSnapshot, setSnapshot] = useState(getTokenSnapshot);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [teamsOpen, setTeamsOpen] = useState(false);
   const [issuingToken, setIssuingToken] = useState(false);
   const [form] = Form.useForm<{ userId: string }>();
 
@@ -109,8 +111,17 @@ export default function AppLayout() {
           {SLOGANS[sloganIdx]}
         </div>
 
+        {/* 团队管理入口 */}
+        <Button
+          icon={<TeamOutlined />}
+          onClick={() => setTeamsOpen(true)}
+          style={{ marginLeft: 'auto', borderRadius: 'var(--radius-xl)', fontWeight: 500 }}
+        >
+          团队管理
+        </Button>
+
         {/* 右侧用户区域 */}
-        <div style={{ marginLeft: 'auto' }}>
+        <div style={{ marginLeft: 12 }}>
           {tokenSnapshot ? (
             <Dropdown
               menu={{
@@ -174,6 +185,9 @@ export default function AppLayout() {
       <Content style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
       </Content>
+
+      {/* 团队管理 Drawer */}
+      <TeamManagement open={teamsOpen} onClose={() => setTeamsOpen(false)} />
 
       {/* 登录弹窗 —— 美化 */}
       <Modal

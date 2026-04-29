@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Team,
   Project,
   ProjectMember,
   FlowDefinition,
+  Flowchart,
   NodeExecution,
   ArtifactBinding,
   Document,
@@ -21,6 +23,9 @@ import {
  */
 @Injectable()
 export class StoreService {
+  /** 团队主数据 */
+  readonly teams: Map<string, Team> = new Map();
+
   /** 项目主数据 */
   readonly projects: Map<string, Project> = new Map();
 
@@ -29,6 +34,9 @@ export class StoreService {
 
   /** 流程定义（含草稿与已发布版本） */
   readonly flowDefinitions: Map<string, FlowDefinition> = new Map();
+
+  /** 流程图元数据（独立实体，支持子流程图） */
+  readonly flowcharts: Map<string, Flowchart> = new Map();
 
   /** 节点执行实例（运行态） */
   readonly nodeExecutions: Map<string, NodeExecution> = new Map();
