@@ -4,9 +4,11 @@ import {
   IsOptional,
   IsArray,
   IsUUID,
+  Matches,
   MaxLength,
   ArrayMaxSize,
 } from 'class-validator';
+import { USER_ID_PATTERN } from '../../common/constants/validation-patterns';
 
 /** 创建团队请求体 */
 export class CreateTeamDto {
@@ -14,6 +16,9 @@ export class CreateTeamDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
+  @Matches(/^[^\r\n\t]{1,100}$/, {
+    message: 'name 不能包含换行或制表符',
+  })
   name: string;
 
   /** 团队描述（可选） */
@@ -27,5 +32,9 @@ export class CreateTeamDto {
   @IsArray()
   @ArrayMaxSize(50)
   @IsString({ each: true })
+  @Matches(USER_ID_PATTERN, {
+    each: true,
+    message: 'memberIds 中存在非法用户 ID',
+  })
   memberIds?: string[];
 }

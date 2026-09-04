@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
+  DatePicker,
   Divider,
   Dropdown,
   Form,
   Input,
+  InputNumber,
   message,
   Modal,
+  Select,
   Space,
   Switch,
   Tag,
@@ -15,14 +18,22 @@ import {
 } from 'antd';
 import {
   AimOutlined,
+  AppstoreOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
   DeleteOutlined,
-  FlagOutlined,
   LinkOutlined,
+  LoadingOutlined,
   MinusCircleOutlined,
   PlusOutlined,
+  PlayCircleOutlined,
   ReloadOutlined,
   SaveOutlined,
   StopOutlined,
+  WarningOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
 } from '@ant-design/icons';
 import type {
   ExecutionStatus,
@@ -31,6 +42,7 @@ import type {
   NodeType,
   UpdateFlowDraftDto,
 } from '../../api/types';
+import { generateNodeId, buildNodeIdSet } from '../../utils/naming';
 import dayjs from 'dayjs';
 
 const { Text } = Typography;
@@ -43,20 +55,11 @@ const PRIORITY_DOT_COLOR: Record<string, string> = {
   URGENT: '#ef4444',
 };
 
-/** 节点卡片常量 */
-const NODE_WIDTH = 180;
+/** 节点卡片常量（统一圆角矩形语义） */
+const NODE_WIDTH = 168;
+/* 节点卡片高度：3行内容（头部+meta+footer）+ 上下各12px内边距，合计约96px才能完整展示 */
 const NODE_HEIGHT = 96;
-
-/** 多人节点（圆形）常量 */
-const CIRCLE_DIAMETER = 120;
-const CIRCLE_RADIUS = CIRCLE_DIAMETER / 2;
-
-/** 起始节点（椭圆）常量 */
-const START_WIDTH = 160;
-const START_HEIGHT = 72;
-
-/** 终止节点（同心圆）常量 */
-const END_DIAMETER = 100;
+const BRANCH_NODE_WIDTH = 196;
 
 /** 画布内部节点模型 */
 interface CanvasNode {
@@ -92,17 +95,28 @@ const STATUS_LABEL: Record<ExecutionStatus, string> = {
   GATE_CHECKING: '门禁检查中',
   COMPLETED: '已完成',
   NEEDS_FIX: '待补齐',
+  REJECTED: '被回退',
 };
 
-/** 状态对应图标 Emoji（轻量，无需引入额外图标） */
-const STATUS_EMOJI: Record<ExecutionStatus, string> = {
-  PENDING: '⏳',
-  READY: '🟢',
-  IN_PROGRESS: '🔧',
-  GATE_CHECKING: '🔍',
-  COMPLETED: '✅',
-  NEEDS_FIX: '🔴',
-};
+function renderStatusIcon(status?: ExecutionStatus) {
+  switch (status) {
+    case 'READY':
+      return <PlayCircleOutlined className="flow-node-status-icon flow-node-status-icon--ready" />;
+    case 'IN_PROGRESS':
+      return <LoadingOutlined className="flow-node-status-icon flow-node-status-icon--progress" />;
+    case 'GATE_CHECKING':
+      return <LoadingOutlined className="flow-node-status-icon flow-node-status-icon--checking" />;
+    case 'COMPLETED':
+      return <CheckCircleOutlined className="flow-node-status-icon flow-node-status-icon--success" />;
+    case 'NEEDS_FIX':
+      return <WarningOutlined className="flow-node-status-icon flow-node-status-icon--warning" />;
+    case 'REJECTED':
+      return <CloseCircleOutlined className="flow-node-status-icon flow-node-status-icon--danger" />;
+    case 'PENDING':
+    default:
+      return <ClockCircleOutlined className="flow-node-status-icon flow-node-status-icon--pending" />;
+  }
+}
 
 /**
  * 计算从矩形中心朝目标方向与矩形边缘的交点
@@ -130,45 +144,9 @@ function getEdgePoint(
   }
 }
 
-/**
- * 计算从圆形中心朝目标方向与圆形边缘的交点
- * 用于圆形节点的通用连线碰撞计算
- */
-function getCircleEdgePoint(
-  cx: number, cy: number, radius: number,
-  tx: number, ty: number,
-) {
-  const dx = tx - cx;
-  const dy = ty - cy;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist === 0) return { x: cx, y: cy };
-  return { x: cx + (dx / dist) * radius, y: cy + (dy / dist) * radius };
-}
-
-/**
- * 计算从椭圆中心朝目标方向与椭圆边缘的交点
- * 用于起始节点（椭圆形）的连线碰撞计算
- * @param a 椭圆水平半轴长
- * @param b 椭圆垂直半轴长
- */
-function getEllipseEdgePoint(
-  cx: number, cy: number,
-  a: number, b: number,
-  tx: number, ty: number,
-) {
-  const dx = tx - cx;
-  const dy = ty - cy;
-  if (dx === 0 && dy === 0) return { x: cx, y: cy };
-  const angle = Math.atan2(dy, dx);
-  return {
-    x: cx + a * Math.cos(angle),
-    y: cy + b * Math.sin(angle),
-  };
-}
-
-/** 判定是否为多人节点（assignees > 1 时渲染为圆形） */
-function isMultiAssignee(config?: { assignees?: string[] }): boolean {
-  return (config?.assignees?.length ?? 0) > 1;
+/** 兼容旧数据里的 TASK 类型 */
+function normalizeNodeType(nodeType?: NodeType): NodeType {
+  return nodeType === 'TASK' || !nodeType ? 'TASK_SIMPLE' : nodeType;
 }
 
 /**
@@ -176,12 +154,9 @@ function isMultiAssignee(config?: { assignees?: string[] }): boolean {
  */
 function getNodeShape(
   nodeType: NodeType,
-  config?: { assignees?: string[] },
-): { width: number; height: number; shape: 'ellipse' | 'circle' | 'rect' } {
-  if (nodeType === 'START') return { width: START_WIDTH, height: START_HEIGHT, shape: 'ellipse' };
-  if (nodeType === 'END') return { width: END_DIAMETER, height: END_DIAMETER, shape: 'circle' };
-  if (isMultiAssignee(config)) return { width: CIRCLE_DIAMETER, height: CIRCLE_DIAMETER, shape: 'circle' };
-  return { width: NODE_WIDTH, height: NODE_HEIGHT, shape: 'rect' };
+): { width: number; height: number } {
+  if (nodeType === 'TASK_BRANCH') return { width: BRANCH_NODE_WIDTH, height: NODE_HEIGHT };
+  return { width: NODE_WIDTH, height: NODE_HEIGHT };
 }
 
 /** 规范化节点位置，确保每个节点都有 x/y 和 type */
@@ -193,7 +168,7 @@ function normalizeCanvasNodes(
     text: node.text,
     x: node.x ?? 120 + (idx % 4) * 220,
     y: node.y ?? 80 + Math.floor(idx / 4) * 150,
-    type: node.type ?? 'TASK',
+    type: normalizeNodeType(node.type),
   }));
 }
 
@@ -214,7 +189,12 @@ function uniqueEdges(edges: Array<{ source: string; target: string }>) {
 /** 新增节点表单字段 */
 interface AddNodeFormValues {
   name: string;
+  nodeType?: NodeType;
   description?: string;
+  assignees?: string[];
+  dueDate?: dayjs.Dayjs;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  estimatedHours?: number;
   artifacts: Array<{ name: string; required: boolean }>;
 }
 
@@ -263,6 +243,9 @@ export default function FlowCanvas({
   } | null>(null);
   const [isPanning, setIsPanning] = useState(false);
 
+  /* ── 画布缩放状态（1.0 = 100%，范围 0.1~3.0） ── */
+  const [scale, setScale] = useState(1);
+
   /* ── 节点拖拽状态 ── */
   const draggingRef = useRef<{
     nodeId: string;
@@ -279,15 +262,21 @@ export default function FlowCanvas({
   const [insertTargetEdge, setInsertTargetEdge] = useState<{ source: string; target: string } | null>(null);
   const insertTargetEdgeRef = useRef<{ source: string; target: string } | null>(null);
 
+  /**
+   * 拖拽过程中当前已激活的自动插入状态。
+   * 记录被消耗（暂时删除）的原始边，用于切换候选边时还原。
+   */
+  const activeInsertionRef = useRef<{
+    /** 被替换掉的原始边（还原时重新加回） */
+    originalEdge: { source: string; target: string };
+  } | null>(null);
+
   /* ── 新增节点弹窗 ── */
   const [addNodeModalOpen, setAddNodeModalOpen] = useState(false);
   const [addNodePosition, setAddNodePosition] = useState({ x: 0, y: 0 });
   const [addNodeForm] = Form.useForm<AddNodeFormValues>();
   /** 当前正在新增的节点类型 */
-  const [addNodeType, setAddNodeType] = useState<NodeType>('TASK');
-
-  /* 是否已有终止节点（用于工具栏按钮显隐和终止节点创建限制） */
-  const hasEndNode = useMemo(() => nodes.some((n) => n.type === 'END'), [nodes]);
+  const [addNodeType, setAddNodeType] = useState<NodeType>('TASK_SIMPLE');
 
   /* nodeId -> execution 映射 */
   const execMap = useMemo(() => {
@@ -301,6 +290,15 @@ export default function FlowCanvas({
     const map = new Map<string, (typeof flowDefinition.nodesConfig)[number]>();
     flowDefinition.nodesConfig.forEach((c) => map.set(c.nodeId, c));
     return map;
+  }, [flowDefinition.nodesConfig]);
+
+  /* 从nodeConfig中提取所有assignees用作下拉选项 */
+  const availableAssignees = useMemo(() => {
+    const assigneeSet = new Set<string>();
+    flowDefinition.nodesConfig.forEach((cfg) => {
+      cfg.assignees?.forEach((id) => assigneeSet.add(id));
+    });
+    return Array.from(assigneeSet).sort();
   }, [flowDefinition.nodesConfig]);
 
   /* 当外部数据变化且画布未被编辑时，同步数据 */
@@ -319,6 +317,11 @@ export default function FlowCanvas({
       (e) => idSet.has(e.source) && idSet.has(e.target),
     );
   }, [edges, nodes]);
+  const canvasSummary = useMemo(() => ({
+    totalNodes: nodes.length,
+    totalEdges: linkedEdges.length,
+    inProgress: executions.filter((item) => item.status === 'IN_PROGRESS').length,
+  }), [executions, linkedEdges.length, nodes.length]);
 
   /* refs 用于在全局鼠标事件（useEffect）中访问最新状态 */
   const nodesRef = useRef(nodes);
@@ -368,6 +371,10 @@ export default function FlowCanvas({
   const panOffsetRef = useRef(panOffset);
   panOffsetRef.current = panOffset;
 
+  /* scale ref 用于在事件回调中访问最新缩放比例 */
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+
   useEffect(() => {
     function handleMouseMove(e: MouseEvent) {
       /* 优先处理节点拖拽 */
@@ -386,10 +393,12 @@ export default function FlowCanvas({
         if (!container) return;
         const rect = container.getBoundingClientRect();
         const currentPan = panOffsetRef.current;
+        /* 除以当前缩放比例，将屏幕坐标转换为逻辑坐标 */
+        const currentScale = scaleRef.current;
         const logicX =
-          e.clientX - rect.left - currentPan.x - offsetX;
+          (e.clientX - rect.left - currentPan.x - offsetX) / currentScale;
         const logicY =
-          e.clientY - rect.top - currentPan.y - offsetY;
+          (e.clientY - rect.top - currentPan.y - offsetY) / currentScale;
         setNodes((prev) =>
           prev.map((node) =>
             node.id === dragNodeId
@@ -417,11 +426,18 @@ export default function FlowCanvas({
         for (const edge of currentEdges) {
           /* 跳过与被拖拽节点相关的边 */
           if (edge.source === dragNodeId || edge.target === dragNodeId) continue;
+          /* 跳过已被当前插入消耗的原始边（防止 React 异步更新导致重复检测） */
+          const activeOrig = activeInsertionRef.current?.originalEdge;
+          if (
+            activeOrig &&
+            edge.source === activeOrig.source &&
+            edge.target === activeOrig.target
+          ) continue;
           const srcNode = currentNodes.find((n) => n.id === edge.source);
           const tgtNode = currentNodes.find((n) => n.id === edge.target);
           if (!srcNode || !tgtNode) continue;
-          const srcShape = getNodeShape(srcNode.type, nodeConfigMapRef.current.get(srcNode.id));
-          const tgtShape = getNodeShape(tgtNode.type, nodeConfigMapRef.current.get(tgtNode.id));
+          const srcShape = getNodeShape(normalizeNodeType(srcNode.type));
+          const tgtShape = getNodeShape(normalizeNodeType(tgtNode.type));
           const midX = (srcNode.x + srcShape.width / 2 + tgtNode.x + tgtShape.width / 2) / 2;
           const midY = (srcNode.y + srcShape.height / 2 + tgtNode.y + tgtShape.height / 2) / 2;
           const dist = Math.sqrt((dragCx - midX) ** 2 + (dragCy - midY) ** 2);
@@ -430,6 +446,52 @@ export default function FlowCanvas({
             bestEdge = edge;
           }
         }
+        /* ── 实时自动连线：候选边变化时先还原旧插入再应用新插入 ── */
+        const prevInsertion = activeInsertionRef.current;
+        const prevEdge = prevInsertion?.originalEdge ?? null;
+
+        /* 判断候选边是否与当前激活插入一致（一致则无需重复操作） */
+        const isSameEdge =
+          bestEdge !== null &&
+          prevEdge !== null &&
+          bestEdge.source === prevEdge.source &&
+          bestEdge.target === prevEdge.target;
+
+        if (!isSameEdge) {
+          setEdges((prev) => {
+            let next = [...prev];
+
+            if (prevEdge) {
+              /* 还原旧插入：删除拖拽节点与旧边两端的临时连线，恢复原始边 */
+              next = next.filter(
+                (e) =>
+                  !(e.source === prevEdge.source && e.target === dragNodeId) &&
+                  !(e.source === dragNodeId && e.target === prevEdge.target),
+              );
+              next = [...next, prevEdge];
+            }
+
+            if (bestEdge) {
+              /* 应用新插入：删除目标边，插入拖拽节点 */
+              next = next.filter(
+                (e) =>
+                  !(e.source === bestEdge.source && e.target === bestEdge.target),
+              );
+              next = uniqueEdges([
+                ...next,
+                { source: bestEdge.source, target: dragNodeId },
+                { source: dragNodeId, target: bestEdge.target },
+              ]);
+            } else {
+              next = uniqueEdges(next);
+            }
+
+            return next;
+          });
+          /* 更新激活插入状态 */
+          activeInsertionRef.current = bestEdge ? { originalEdge: bestEdge } : null;
+        }
+
         insertTargetEdgeRef.current = bestEdge;
         setInsertTargetEdge(bestEdge);
 
@@ -449,56 +511,8 @@ export default function FlowCanvas({
     }
 
     function handleMouseUp() {
-      /* ── 拖拽插入：在释放时检查是否有候选插入边 ── */
-      if (draggingRef.current && insertTargetEdgeRef.current) {
-        const dragNodeId = draggingRef.current.nodeId;
-        const { source, target } = insertTargetEdgeRef.current;
-        const currentNodes = nodesRef.current;
-
-        /* 起始/终止节点不允许插入到边中间，跳过插入逻辑 */
-        const draggedNode = currentNodes.find((n) => n.id === dragNodeId);
-        if (draggedNode && (draggedNode.type === 'START' || draggedNode.type === 'END')) {
-          insertTargetEdgeRef.current = null;
-          setInsertTargetEdge(null);
-          draggingRef.current = null;
-          panningRef.current = null;
-          setIsPanning(false);
-          setDraggingNodeId(null);
-          return;
-        }
-
-        const srcNode = currentNodes.find((n) => n.id === source);
-        const tgtNode = currentNodes.find((n) => n.id === target);
-        if (srcNode && tgtNode) {
-          const srcShape = getNodeShape(srcNode.type, nodeConfigMapRef.current.get(srcNode.id));
-          const tgtShape = getNodeShape(tgtNode.type, nodeConfigMapRef.current.get(tgtNode.id));
-          const midX = (srcNode.x + srcShape.width / 2 + tgtNode.x + tgtShape.width / 2) / 2;
-          const midY = (srcNode.y + srcShape.height / 2 + tgtNode.y + tgtShape.height / 2) / 2;
-          const dw = draggingRef.current.nodeWidth;
-          const dh = draggingRef.current.nodeHeight;
-          /* 更新被拖拽节点位置到连线中点 */
-          setNodes((prev) =>
-            prev.map((n) =>
-              n.id === dragNodeId
-                ? { ...n, x: midX - dw / 2, y: midY - dh / 2 }
-                : n,
-            ),
-          );
-          /* 删除原边，创建两条新边 */
-          setEdges((prev) => {
-            const filtered = prev.filter(
-              (e) => !(e.source === source && e.target === target),
-            );
-            return uniqueEdges([
-              ...filtered,
-              { source, target: dragNodeId },
-              { source: dragNodeId, target },
-            ]);
-          });
-          setIsDirty(true);
-        }
-      }
-      /* 清理拖拽插入状态 */
+      /* 拖拽结束：边连接已在拖拽过程中实时更新，此处仅清理状态 */
+      activeInsertionRef.current = null;
       insertTargetEdgeRef.current = null;
       setInsertTargetEdge(null);
       draggingRef.current = null;
@@ -515,6 +529,37 @@ export default function FlowCanvas({
     };
   }, []);
 
+  /* ── 滚轮缩放：绑定 non-passive wheel 事件实现缩放到鼠标位置 ── */
+  useEffect(() => {
+    const container = canvasRef.current;
+    if (!container) return;
+    function handleWheel(e: WheelEvent) {
+      e.preventDefault();
+      const rect = container!.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      /* 向上滚动放大，向下滚动缩小 */
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      const oldScale = scaleRef.current;
+      const newScale = Math.min(Math.max(oldScale * factor, 0.1), 3);
+      /* 缩放到鼠标位置：保持鼠标指向的逻辑点不变 */
+      const newPanX = mouseX - (mouseX - panOffsetRef.current.x) * (newScale / oldScale);
+      const newPanY = mouseY - (mouseY - panOffsetRef.current.y) * (newScale / oldScale);
+      setScale(newScale);
+      setPanOffset({ x: newPanX, y: newPanY });
+    }
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  /* ── 初始加载：自动将流程图缩放适配并居中到画布 ── */
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      handleCenterCanvas();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ═══════════════════════════
    * 双击画布空白区域新增节点
    * ═══════════════════════════ */
@@ -524,47 +569,42 @@ export default function FlowCanvas({
       const container = canvasRef.current;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-      const logicX = e.clientX - rect.left - panOffsetRef.current.x;
-      const logicY = e.clientY - rect.top - panOffsetRef.current.y;
+      /* 除以当前缩放比例，将屏幕坐标转换为逻辑坐标 */
+      const logicX = (e.clientX - rect.left - panOffsetRef.current.x) / scaleRef.current;
+      const logicY = (e.clientY - rect.top - panOffsetRef.current.y) / scaleRef.current;
       /* 第一个节点必须是起始节点 */
-      const nodeType: NodeType = nodes.length === 0 ? 'START' : 'TASK';
+      const nodeType: NodeType = nodes.length === 0 ? 'START' : 'TASK_SIMPLE';
       setAddNodeType(nodeType);
+      addNodeForm.setFieldValue('nodeType', nodeType);
       setAddNodePosition({ x: logicX, y: logicY });
       setAddNodeModalOpen(true);
     },
-    [canEdit, nodes.length],
+    [addNodeForm, canEdit, nodes.length],
   );
 
-  /** 工具栏"添加终止节点" —— 在画布最后一个节点下方自动创建 */
-  function handleAddEndNode() {
-    if (hasEndNode || nodes.length === 0) return;
-    const lastNode = nodes.reduce((a, b) => (a.y > b.y ? a : b));
-    const lastShape = getNodeShape(lastNode.type, nodeConfigMap.get(lastNode.id));
-    const newId = `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const newNode: CanvasNode = {
-      id: newId,
-      text: '终止',
-      x: lastNode.x + (lastShape.width - END_DIAMETER) / 2,
-      y: lastNode.y + lastShape.height + 150,
-      type: 'END',
-    };
-    setNodes((prev) => [...prev, newNode]);
-    pendingNodeConfigsRef.current.set(newId, {
-      name: '终止',
-      type: 'END',
-      artifacts: [],
-    });
-    setIsDirty(true);
+  /** 工具栏新增节点：在当前视口中心弹出新增弹窗 */
+  function handleQuickAddNode(type: NodeType) {
+    if (!canEdit) return;
+    const container = canvasRef.current;
+    if (!container) return;
+    /* 视口中心坐标转换为逻辑坐标（除以缩放比例） */
+    const x = (container.clientWidth / 2 - panOffsetRef.current.x) / scaleRef.current - NODE_WIDTH / 2;
+    const y = (container.clientHeight / 2 - panOffsetRef.current.y) / scaleRef.current - NODE_HEIGHT / 2;
+    setAddNodeType(type);
+    addNodeForm.setFieldValue('nodeType', type);
+    setAddNodePosition({ x: Math.max(20, x), y: Math.max(20, y) });
+    setAddNodeModalOpen(true);
   }
 
   /** 添加子流程节点（向上或向下并行分支） */
   function handleAddSubprocess(parentNodeId: string, direction: 'up' | 'down') {
     const parentNode = nodes.find((n) => n.id === parentNodeId);
     if (!parentNode) return;
-    const parentConfig = nodeConfigMap.get(parentNodeId);
-    const parentShape = getNodeShape(parentNode.type, parentConfig);
-    const newId = `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const parentShape = getNodeShape(normalizeNodeType(parentNode.type));
     const newName = `子流程-${nodes.length + 1}`;
+    // 使用语义化的节点ID：基于节点名称生成，若重复则追加时间戳后缀
+    const existingIds = buildNodeIdSet(nodes);
+    const newId = generateNodeId(newName, existingIds);
     const newEdgesToAdd: Array<{ source: string; target: string }> = [];
     let newX: number;
     let newY: number;
@@ -593,13 +633,13 @@ export default function FlowCanvas({
       text: newName,
       x: newX,
       y: newY,
-      type: 'TASK',
+      type: 'TASK_SIMPLE',
     };
     setNodes((prev) => [...prev, newNode]);
     setEdges((prev) => uniqueEdges([...prev, ...newEdgesToAdd]));
     pendingNodeConfigsRef.current.set(newId, {
       name: newName,
-      type: 'TASK',
+      type: 'TASK_SIMPLE',
       isSubProcess: true,
       artifacts: [],
     });
@@ -635,32 +675,61 @@ export default function FlowCanvas({
   async function handleAddNodeConfirm() {
     try {
       const values = await addNodeForm.validateFields();
-      const newId = `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+      const assignees = values.assignees?.map((item) => item.trim()).filter(Boolean);
+      // 使用语义化的节点ID：基于节点名称生成，若重复则追加时间戳后缀
+      const existingIds = buildNodeIdSet(nodes);
+      const newId = generateNodeId(values.name, existingIds);
+      const resolvedType: NodeType = values.nodeType ?? addNodeType;
       const newNode: CanvasNode = {
         id: newId,
         text: values.name,
         x: addNodePosition.x,
         y: addNodePosition.y,
-        type: addNodeType,
+        type: resolvedType,
       };
-      setNodes((prev) => [...prev, newNode]);
-      setSelectedNodeId(newId);
-      setIsDirty(true);
+      /* 注册新节点配置 */
       pendingNodeConfigsRef.current.set(newId, {
         name: values.name,
         description: values.description,
-        /* 新增字段默认值（暂不在新建弹窗中编辑，保留 undefined） */
-        assignees: undefined,
-        dueDate: undefined,
-        priority: undefined,
-        estimatedHours: undefined,
-        type: addNodeType,
+        /* 执行配置会直接影响节点执行链路，创建时允许一并补齐。 */
+        assignees: assignees?.length ? assignees : undefined,
+        dueDate: values.dueDate?.toISOString(),
+        priority: values.priority,
+        estimatedHours: values.estimatedHours,
+        type: resolvedType,
         artifacts: (values.artifacts ?? []).map((a) => ({
           id: `art-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
           name: a.name,
           required: a.required ?? false,
         })),
       });
+
+      if (resolvedType === 'START') {
+        /* 创建起始节点时，同步在其正下方自动生成终止节点（START+END 成对出现） */
+        // 为END节点生成语义化ID（遵循 node_{slug} 格式标准）
+        const endNodeIds = buildNodeIdSet([...nodes, newNode]);
+        const endId = generateNodeId('END', endNodeIds);
+        const endNode: CanvasNode = {
+          id: endId,
+          text: '结束',
+          x: addNodePosition.x,
+          y: addNodePosition.y + NODE_HEIGHT + 150,
+          type: 'END',
+        };
+        pendingNodeConfigsRef.current.set(endId, {
+          name: '结束',
+          type: 'END',
+          artifacts: [],
+        });
+        setNodes((prev) => [...prev, newNode, endNode]);
+          /* 创建默认起止连线 */
+          setEdges((prev) => uniqueEdges([...prev, { source: newId, target: endId }]));
+      } else {
+        setNodes((prev) => [...prev, newNode]);
+      }
+
+      setSelectedNodeId(newId);
+      setIsDirty(true);
       setAddNodeModalOpen(false);
       addNodeForm.resetFields();
     } catch {
@@ -792,32 +861,42 @@ export default function FlowCanvas({
     };
   }
 
-  /** 聚焦画布中心 —— 计算所有节点的包围盒并将其中心对齐画布中心 */
+  /** 居中并适配画布 —— 计算所有节点包围盒，将其缩放居中到画布可视区域 */
   function handleCenterCanvas() {
-    if (nodes.length === 0) return;
+    const currentNodes = nodesRef.current;
+    if (currentNodes.length === 0) return;
     const container = canvasRef.current;
     if (!container) return;
-    // 计算所有节点的边界矩形（考虑不同节点形状的尺寸）
+    /* 计算所有节点的包围盒 */
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const n of nodes) {
-      const nc = nodeConfigMap.get(n.id);
-      const shape = getNodeShape(n.type, nc);
+    for (const n of currentNodes) {
+      const shape = getNodeShape(normalizeNodeType(n.type));
       if (n.x < minX) minX = n.x;
       if (n.y < minY) minY = n.y;
       if (n.x + shape.width > maxX) maxX = n.x + shape.width;
       if (n.y + shape.height > maxY) maxY = n.y + shape.height;
     }
-    // 节点群中心
+    const contentW = maxX - minX;
+    const contentH = maxY - minY;
+    const { clientWidth, clientHeight } = container;
+    /* 计算适配缩放比例（带 80px 内边距，最大不超过 1.5） */
+    const padding = 80;
+    const fitScale = (contentW > 0 && contentH > 0)
+      ? Math.min(
+          (clientWidth - padding * 2) / contentW,
+          (clientHeight - padding * 2) / contentH,
+          1.5,
+        )
+      : 1;
+    const clampedScale = Math.max(0.1, fitScale);
+    /* 节点群中心 */
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
-    // 画布容器可视区域中心
-    const { clientWidth, clientHeight } = container;
-    const canvasCenterX = clientWidth / 2;
-    const canvasCenterY = clientHeight / 2;
-    // 计算让节点群中心对齐画布中心所需的偏移量
+    /* 使节点群中心对齐画布中心，同时应用适配缩放 */
+    setScale(clampedScale);
     setPanOffset({
-      x: canvasCenterX - centerX,
-      y: canvasCenterY - centerY,
+      x: clientWidth / 2 - centerX * clampedScale,
+      y: clientHeight / 2 - centerY * clampedScale,
     });
   }
 
@@ -882,10 +961,15 @@ export default function FlowCanvas({
           justifyContent: 'center',
         }}
       >
-        <div style={{ textAlign: 'center', animation: 'fadeIn 0.4s ease' }}>
-          <div style={{ fontSize: 48, opacity: 0.3, marginBottom: 12 }}>📋</div>
-          <Text type="secondary" style={{ fontSize: 14 }}>
-            流程尚未配置节点，请切换到编辑模式添加
+        <div className="flow-canvas-empty-state">
+          <div className="flow-canvas-empty-state__icon">
+            <AppstoreOutlined />
+          </div>
+          <Text className="flow-canvas-empty-state__title">
+            这张流程图还没有节点
+          </Text>
+          <Text className="flow-canvas-empty-state__hint">
+            切换到编辑模式后，可以从起始节点开始搭建你的交付流程。
           </Text>
         </div>
       </div>
@@ -894,9 +978,10 @@ export default function FlowCanvas({
 
   return (
     <div className="flow-canvas-wrapper">
-      {/* ─── 统一底部操作区：模式切换 + 编辑按钮（与删除/连线同区） ─── */}
+      {/* ─── 统一工具栏：单行layout (flex row)，按钮统一高度和间距 ─── */}
       <div className={`flow-canvas-toolbar ${canEdit ? 'flow-canvas-toolbar--edit' : 'flow-canvas-toolbar--view'}`}>
-        <div className="flow-canvas-toolbar-left" key={mode}>
+        {/* Mode + Refresh + Add节点 + Delete + Connect + Save */}
+        <div className="flow-canvas-toolbar-left">
           <div className="flow-canvas-toolbar-mode">
             <Text style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
               编辑模式
@@ -920,7 +1005,7 @@ export default function FlowCanvas({
               size="small"
               icon={<ReloadOutlined />}
               onClick={onRefresh}
-              style={{ borderRadius: 'var(--radius-sm)' }}
+              style={{ borderRadius: 'var(--radius-sm)', height: 32 }}
             >
               刷新
             </Button>
@@ -928,12 +1013,26 @@ export default function FlowCanvas({
 
           {canEdit && (
             <>
+              <Dropdown
+                menu={{
+                  items: [
+                    { key: 'TASK_SIMPLE', label: '无分支任务节点' },
+                    { key: 'TASK_BRANCH', label: '有分支任务节点' },
+                  ],
+                  onClick: ({ key }) => handleQuickAddNode(key as NodeType),
+                }}
+                trigger={['click']}
+              >
+                <Button size="small" icon={<PlusOutlined />} style={{ borderRadius: 'var(--radius-sm)', height: 32 }}>
+                  节点
+                </Button>
+              </Dropdown>
               <Button
                 size="small"
                 icon={<DeleteOutlined />}
                 disabled={!selectedNodeId}
                 onClick={handleDeleteNode}
-                style={{ borderRadius: 'var(--radius-sm)' }}
+                style={{ borderRadius: 'var(--radius-sm)', height: 32 }}
               >
                 删除
               </Button>
@@ -946,7 +1045,7 @@ export default function FlowCanvas({
                     prev ? null : selectedNodeId,
                   )
                 }
-                style={{ borderRadius: 'var(--radius-sm)' }}
+                style={{ borderRadius: 'var(--radius-sm)', height: 32 }}
               >
                 {connectFromNodeId ? '取消连线' : '连线'}
               </Button>
@@ -957,20 +1056,11 @@ export default function FlowCanvas({
                 loading={saving}
                 disabled={!isDirty}
                 onClick={handleSave}
-                style={{ borderRadius: 'var(--radius-sm)', fontWeight: 500 }}
+                style={{ borderRadius: 'var(--radius-sm)', fontWeight: 500, height: 32 }}
               >
                 保存草稿
               </Button>
-              {!hasEndNode && nodes.length > 0 && (
-                <Button
-                  size="small"
-                  icon={<FlagOutlined />}
-                  onClick={handleAddEndNode}
-                  style={{ borderRadius: 'var(--radius-sm)' }}
-                >
-                  添加终止节点
-                </Button>
-              )}
+
             </>
           )}
 
@@ -981,6 +1071,18 @@ export default function FlowCanvas({
           )}
         </div>
 
+        {/* Spacer */}
+        <div style={{ flex: 1 }} />
+
+        {/* 统计信息 */}
+        <div className="flow-canvas-toolbar-stats">
+          <span className="flow-canvas-stat-pill">节点 {canvasSummary.totalNodes}</span>
+          <span className="flow-canvas-stat-pill">连线 {canvasSummary.totalEdges}</span>
+          <span className="flow-canvas-stat-pill is-highlight">进行中 {canvasSummary.inProgress}</span>
+          {isDirty && <span className="flow-canvas-stat-pill is-warning">有未保存改动</span>}
+        </div>
+
+        {/* 提示信息 */}
         <Text className="flow-canvas-toolbar-hint" type="secondary">
           {canEdit
             ? '双击空白处新增 · 拖拽移动 · 点击后连线'
@@ -995,6 +1097,7 @@ export default function FlowCanvas({
         style={{
           cursor: isPanning ? 'grabbing' : 'grab',
           backgroundPosition: `${panOffset.x}px ${panOffset.y}px`,
+          position: 'relative',
         }}
         onMouseDown={handleCanvasMouseDown}
         onDoubleClick={handleCanvasDoubleClick}
@@ -1012,11 +1115,46 @@ export default function FlowCanvas({
           居中
         </Button>
 
+        {/* 缩放浮窗 —— 右上角 */}
+        <div className="flow-canvas-zoom-floating">
+          <Button
+            type="text"
+            size="small"
+            icon={<ZoomInOutlined />}
+            onClick={() => {
+              const newScale = Math.min(scaleRef.current * 1.25, 3);
+              setScale(newScale);
+            }}
+            style={{ borderRadius: 'var(--radius-sm)', height: 32, width: 32, padding: 0 }}
+            title="放大 (Scroll up)"
+          />
+          <span
+            className="flow-canvas-zoom-label"
+            style={{ cursor: 'pointer', userSelect: 'none', padding: '0 8px', fontSize: 12 }}
+            onClick={() => { setScale(1); }}
+            title="点击重置为 100%"
+          >
+            {Math.round(scale * 100)}%
+          </span>
+          <Button
+            type="text"
+            size="small"
+            icon={<ZoomOutOutlined />}
+            onClick={() => {
+              const newScale = Math.max(scaleRef.current * 0.8, 0.1);
+              setScale(newScale);
+            }}
+            style={{ borderRadius: 'var(--radius-sm)', height: 32, width: 32, padding: 0 }}
+            title="缩小 (Scroll down)"
+          />
+        </div>
+
         {/* 变换层：受平移偏移影响 */}
         <div
           className="flow-canvas-transform"
           style={{
-            transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${scale})`,
+            transformOrigin: '0 0',
           }}
         >
           {/* SVG 连线层 —— 贝塞尔曲线 + 流动动画 */}
@@ -1044,10 +1182,8 @@ export default function FlowCanvas({
               if (!src || !tgt) return null;
 
               /* 获取两端节点的形状信息（统一处理矩形、圆形、椭圆） */
-              const srcConfig = nodeConfigMap.get(edge.source);
-              const tgtConfig = nodeConfigMap.get(edge.target);
-              const srcShape = getNodeShape(src.type, srcConfig);
-              const tgtShape = getNodeShape(tgt.type, tgtConfig);
+              const srcShape = getNodeShape(normalizeNodeType(src.type));
+              const tgtShape = getNodeShape(normalizeNodeType(tgt.type));
 
               /* 计算各节点中心坐标 */
               const srcCx = src.x + srcShape.width / 2;
@@ -1055,37 +1191,23 @@ export default function FlowCanvas({
               const tgtCx = tgt.x + tgtShape.width / 2;
               const tgtCy = tgt.y + tgtShape.height / 2;
 
-              /* 多人圆形节点特殊处理：出边底部、入边顶部（分叉视觉） */
-              const srcIsMulti = src.type === 'TASK' && isMultiAssignee(srcConfig);
-              const tgtIsMulti = tgt.type === 'TASK' && isMultiAssignee(tgtConfig);
-
-              /* 计算连线端点 —— 按节点形状选择不同碰撞计算 */
-              let p1: { x: number; y: number };
-              let p2: { x: number; y: number };
-
-              /* 源节点出边点 */
-              if (srcIsMulti) {
-                p1 = { x: srcCx, y: srcCy + CIRCLE_RADIUS };
-              } else if (srcShape.shape === 'ellipse') {
-                p1 = getEllipseEdgePoint(srcCx, srcCy, srcShape.width / 2, srcShape.height / 2, tgtCx, tgtCy);
-              } else if (srcShape.shape === 'circle') {
-                p1 = getCircleEdgePoint(srcCx, srcCy, srcShape.width / 2, tgtCx, tgtCy);
-              } else {
-                const aimY = tgtIsMulti ? tgtCy - CIRCLE_RADIUS : tgtCy;
-                p1 = getEdgePoint(srcCx, srcCy, NODE_WIDTH / 2, NODE_HEIGHT / 2, tgtCx, aimY);
-              }
-
-              /* 目标节点入边点 */
-              if (tgtIsMulti) {
-                p2 = { x: tgtCx, y: tgtCy - CIRCLE_RADIUS };
-              } else if (tgtShape.shape === 'ellipse') {
-                p2 = getEllipseEdgePoint(tgtCx, tgtCy, tgtShape.width / 2, tgtShape.height / 2, srcCx, srcCy);
-              } else if (tgtShape.shape === 'circle') {
-                p2 = getCircleEdgePoint(tgtCx, tgtCy, tgtShape.width / 2, srcCx, srcCy);
-              } else {
-                const aimY = srcIsMulti ? srcCy + CIRCLE_RADIUS : srcCy;
-                p2 = getEdgePoint(tgtCx, tgtCy, NODE_WIDTH / 2, NODE_HEIGHT / 2, srcCx, aimY);
-              }
+              /* 计算连线端点 —— 统一矩形节点碰撞计算 */
+              const p1 = getEdgePoint(
+                srcCx,
+                srcCy,
+                srcShape.width / 2,
+                srcShape.height / 2,
+                tgtCx,
+                tgtCy,
+              );
+              const p2 = getEdgePoint(
+                tgtCx,
+                tgtCy,
+                tgtShape.width / 2,
+                tgtShape.height / 2,
+                srcCx,
+                srcCy,
+              );
 
               const x1 = p1.x, y1 = p1.y;
               const x2 = p2.x, y2 = p2.y;
@@ -1132,26 +1254,24 @@ export default function FlowCanvas({
             const isDragging = draggingNodeId === node.id;
 
             /* 根据节点类型判定形状与尺寸 */
-            const nodeType = node.type ?? 'TASK';
+            const nodeType = normalizeNodeType(node.type);
             const isStart = nodeType === 'START';
             const isEnd = nodeType === 'END';
-            /* START/END 节点不参与多人圆形判定 */
-            const isCircle = !isStart && !isEnd && isMultiAssignee(nConfig);
-            const shapeInfo = getNodeShape(nodeType, nConfig);
+            const isBranch = nodeType === 'TASK_BRANCH';
+            const shapeInfo = getNodeShape(nodeType);
             const nodeW = shapeInfo.width;
             const nodeH = shapeInfo.height;
-
-            /* 终止节点完成状态判定 */
-            const isEndCompleted = isEnd && execution?.status === 'COMPLETED';
+            const assigneeCount = execution?.assignees.length ?? nConfig?.assignees?.length ?? 0;
 
             /* 构建 CSS 类名 */
-            const typeClass = isStart
-              ? 'real-flow-node--start'
+            const typeClass = `real-flow-node--type-${nodeType.toLowerCase().replace('_', '-')}`;
+            const typeLabel = isStart
+              ? '开始'
               : isEnd
-              ? `real-flow-node--end${isEndCompleted ? ' real-flow-node--end-completed' : ''}`
-              : isCircle
-              ? 'real-flow-node--circle'
-              : '';
+              ? '结束'
+              : isBranch
+              ? '分支任务'
+              : '任务';
 
             return (
               <div
@@ -1169,7 +1289,7 @@ export default function FlowCanvas({
                     : undefined,
                   cursor: canEdit ? (isDragging ? 'grabbing' : 'grab') : 'pointer',
                   zIndex: isDragging ? 100 : selected ? 10 : 1,
-                  /* 子流程按钮需要溢出节点边界，编辑模式下 TASK 节点允许 overflow */
+                  /* 子流程按钮需要溢出节点边界，编辑模式下任务节点允许 overflow */
                   overflow: canEdit && !isStart && !isEnd ? 'visible' : undefined,
                 }}
                 onMouseDown={(e) => handleNodeMouseDown(e, node.id, nodeW, nodeH)}
@@ -1180,105 +1300,59 @@ export default function FlowCanvas({
                 onDoubleClick={(e) => e.stopPropagation()}
                 role="button"
               >
-                {isStart ? (
-                  /* 起始节点（椭圆）：节点名 + 起始标签 + 已就绪资料数量 */
-                  <>
-                    <Text strong style={{ fontSize: 13, display: 'block', lineHeight: 1.3 }}>
-                      {node.text}
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.2 }}>🚀 起始</Text>
-                    {nConfig?.requiredArtifacts && nConfig.requiredArtifacts.length > 0 && (
-                      <Text type="secondary" style={{ fontSize: 9, lineHeight: 1.2, opacity: 0.7 }}>
-                        📄 {nConfig.requiredArtifacts.length} 项已就绪资料
-                      </Text>
+                <div className="flow-node-card__head">
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+                    {nConfig?.priority && (
+                      <span
+                        title={`优先级: ${nConfig.priority}`}
+                        style={{
+                          display: 'inline-block',
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor: PRIORITY_DOT_COLOR[nConfig.priority] ?? '#94a3b8',
+                          marginRight: 6,
+                          flexShrink: 0,
+                        }}
+                      />
                     )}
-                  </>
-                ) : isEnd ? (
-                  /* 终止节点（同心圆）：居中"终止"标签 + 完成状态 */
-                  <>
-                    <Text strong style={{ fontSize: 12, display: 'block', lineHeight: 1.3, position: 'relative', zIndex: 1 }}>
-                      终止
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.2, position: 'relative', zIndex: 1 }}>
-                      {isEndCompleted ? '✅ 已完成' : '⏳ 未完成'}
-                    </Text>
-                  </>
-                ) : isCircle ? (
-                  /* 圆形节点：紧凑居中内容 */
-                  <>
-                    <span style={{ fontSize: 18, lineHeight: 1 }}>
-                      {execution ? STATUS_EMOJI[execution.status] : '⏳'}
-                    </span>
-                    <Text strong style={{ fontSize: 12, display: 'block', lineHeight: 1.3, maxWidth: CIRCLE_DIAMETER - 24, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {renderStatusIcon(execution?.status)}
+                    <Text strong ellipsis style={{ fontSize: 13, maxWidth: isBranch ? 108 : 124 }}>
                       {node.text}
                     </Text>
-                    <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.2 }}>
-                      {execution ? STATUS_LABEL[execution.status] : '未生成'}
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: 9, lineHeight: 1.2, opacity: 0.7 }}>
-                      👥 {nConfig?.assignees?.length ?? 0}人
-                    </Text>
-                  </>
-                ) : (
-                  /* 矩形节点：原有完整内容 */
-                  <>
-                    {/* 优先级色点 + 状态 Emoji 指示 */}
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                  {nConfig?.priority && (
-                    <span
-                      title={`优先级: ${nConfig.priority}`}
-                      style={{
-                        display: 'inline-block',
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        backgroundColor: PRIORITY_DOT_COLOR[nConfig.priority] ?? '#94a3b8',
-                        marginRight: 4,
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-                  <span style={{ fontSize: 14, marginRight: 4 }}>
-                    {execution ? STATUS_EMOJI[execution.status] : '⏳'}
-                  </span>
+                  </div>
+                  {isBranch && <span className="flow-node-branch-pill">子流程</span>}
                 </div>
-                <Text strong style={{ fontSize: 14, display: 'block' }}>
-                  {node.text}
-                </Text>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {execution
-                    ? STATUS_LABEL[execution.status]
-                    : '未生成执行实例'}
-                </Text>
-                {/* 截止日期（小字展示） */}
-                {nConfig?.dueDate && (
-                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>
-                    ⏰ {dayjs(nConfig.dueDate).format('MM-DD')}
+                <div className="flow-node-card__meta">
+                  <Tag className="flow-node-type-tag">{typeLabel}</Tag>
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {execution ? STATUS_LABEL[execution.status] : '未生成执行实例'}
                   </Text>
-                )}
-                {/* 执行人摘要 */}
-                {nConfig?.assignees && nConfig.assignees.length > 0 && (
-                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>
-                    👤 {nConfig.assignees[0]}{nConfig.assignees.length > 1 ? ` +${nConfig.assignees.length - 1}` : ''}
-                  </Text>
-                )}
+                </div>
+                <div className="flow-node-card__footer">
+                  {nConfig?.dueDate ? (
+                    <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>
+                      截止 {dayjs(nConfig.dueDate).format('MM-DD')}
+                    </Text>
+                  ) : (
+                    <span className="flow-node-card__footer-placeholder">未设置截止时间</span>
+                  )}
+                  {assigneeCount > 0 && (
+                    <span className="flow-node-card__assignees">{assigneeCount} 人</span>
+                  )}
+                </div>
                 {canEdit && selected && (
-                  <Text
-                    type="secondary"
-                    style={{ fontSize: 10, marginTop: 4, opacity: 0.7 }}
-                  >
+                  <Text type="secondary" style={{ fontSize: 10, marginTop: 2, opacity: 0.7 }}>
                     {node.id}
                   </Text>
-                )}
-                  </>
                 )}
                 {/* 子流程"+"按钮 —— 仅编辑模式下非 START/END 节点显示 */}
                 {canEdit && !isStart && !isEnd && (
                   <Dropdown
                     menu={{
                       items: [
-                        { key: 'up', label: '⬆ 向上添加子流程' },
-                        { key: 'down', label: '⬇ 向下添加子流程' },
+                        { key: 'up', label: '向上添加子流程' },
+                        { key: 'down', label: '向下添加子流程' },
                       ],
                       onClick: ({ key }) => {
                         handleAddSubprocess(node.id, key as 'up' | 'down');
@@ -1305,8 +1379,8 @@ export default function FlowCanvas({
             const srcNode = nodes.find((n) => n.id === insertTargetEdge.source);
             const tgtNode = nodes.find((n) => n.id === insertTargetEdge.target);
             if (!srcNode || !tgtNode) return null;
-            const srcShape = getNodeShape(srcNode.type, nodeConfigMap.get(srcNode.id));
-            const tgtShape = getNodeShape(tgtNode.type, nodeConfigMap.get(tgtNode.id));
+            const srcShape = getNodeShape(normalizeNodeType(srcNode.type));
+            const tgtShape = getNodeShape(normalizeNodeType(tgtNode.type));
             const midX = (srcNode.x + srcShape.width / 2 + tgtNode.x + tgtShape.width / 2) / 2;
             const midY = (srcNode.y + srcShape.height / 2 + tgtNode.y + tgtShape.height / 2) / 2;
             return (
@@ -1338,8 +1412,23 @@ export default function FlowCanvas({
         <Form
           form={addNodeForm}
           layout="vertical"
-          initialValues={{ artifacts: [] }}
+          initialValues={{ artifacts: [], nodeType: addNodeType }}
         >
+          <Form.Item label="节点类型" name="nodeType">
+            <Select
+              disabled={addNodeType === 'START'}
+              options={
+                addNodeType === 'START'
+                  ? [
+                      { label: 'START（起始）', value: 'START' },
+                    ]
+                  : [
+                      { label: 'TASK_SIMPLE（无分支任务）', value: 'TASK_SIMPLE' },
+                      { label: 'TASK_BRANCH（有分支任务）', value: 'TASK_BRANCH' },
+                    ]
+              }
+            />
+          </Form.Item>
           <Form.Item
             label="节点名称"
             name="name"
@@ -1356,6 +1445,48 @@ export default function FlowCanvas({
               placeholder="可选：简要说明该节点职责"
               rows={2}
               maxLength={200}
+            />
+          </Form.Item>
+          <Divider orientation="left" style={{ fontSize: 13 }}>
+            执行配置（建议填写）
+          </Divider>
+          <Form.Item
+            label="负责人 ID"
+            name="assignees"
+            extra="支持选择多个用户，用于补齐节点执行责任人。"
+          >
+            <Select
+              mode="multiple"
+              placeholder="请选择负责人"
+              options={availableAssignees.map((id) => ({ value: id, label: id }))}
+              notFoundContent={<Text type="secondary" style={{ fontSize: 12 }}>暂无可选人员</Text>}
+            />
+          </Form.Item>
+          <Form.Item label="截止时间" name="dueDate">
+            <DatePicker
+              showTime
+              style={{ width: '100%' }}
+              placeholder="可选，设置节点计划截止时间"
+            />
+          </Form.Item>
+          <Form.Item label="优先级" name="priority">
+            <Select
+              allowClear
+              placeholder="可选，选择节点优先级"
+              options={[
+                { label: '低', value: 'LOW' },
+                { label: '中', value: 'MEDIUM' },
+                { label: '高', value: 'HIGH' },
+                { label: '紧急', value: 'URGENT' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="预估工时（小时）" name="estimatedHours">
+            <InputNumber
+              min={0}
+              precision={1}
+              style={{ width: '100%' }}
+              placeholder="可选，填写预估投入时间"
             />
           </Form.Item>
           <Divider orientation="left" style={{ fontSize: 13 }}>

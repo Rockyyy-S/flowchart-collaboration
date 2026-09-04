@@ -6,7 +6,10 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:round1": "playwright test tests/round1.flow-editor.spec.ts",
+    "test:e2e:round2": "playwright test tests/round2.flow-editor.spec.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^5.3.7",
@@ -24,6 +27,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
+    "@playwright/test": "^1.55.0",
     "autoprefixer": "^10.4.19",
     "jsdom": "^25.0.1",
     "postcss": "^8.4.38",

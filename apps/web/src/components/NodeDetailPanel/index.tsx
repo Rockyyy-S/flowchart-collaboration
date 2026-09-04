@@ -21,14 +21,17 @@ import {
 } from 'antd';
 import {
   CheckCircleOutlined,
+  ClockCircleOutlined,
   CloseOutlined,
   DislikeOutlined,
   ExclamationCircleOutlined,
   FileAddOutlined,
+  FileTextOutlined,
   LikeOutlined,
   PlayCircleOutlined,
   SendOutlined,
   StopOutlined,
+  TeamOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -98,9 +101,6 @@ export default function NodeDetailPanel({
     checkedAt: string;
     missingArtifacts: Array<{ requirementId: string; name: string }>;
   } | null>(null);
-
-  // 抑制未使用的 currentUserId 警告（保留备用）
-  void currentUserId;
 
   const executionId = execution?.executionId;
 
@@ -185,8 +185,11 @@ export default function NodeDetailPanel({
   const statusCfg = STATUS_TAG[execution.status] ?? STATUS_TAG.PENDING;
   const requiredArtifacts = nodeConfig?.requiredArtifacts ?? [];
   const missingIds = new Set(gateResult?.missingArtifacts.map((m) => m.requirementId) ?? []);
-  const canStart = execution.status === 'READY' || execution.status === 'NEEDS_FIX';
-  const canSubmit = execution.status === 'IN_PROGRESS';
+  const requiredCount = requiredArtifacts.filter((item) => item.required).length;
+  /* 当前面板允许所有人查看，具体操作仍限定为节点参与者。 */
+  const isCurrentUserAssignee = !!currentUserId && execution.assignees.includes(currentUserId);
+  const canStart = isCurrentUserAssignee && (execution.status === 'READY' || execution.status === 'NEEDS_FIX');
+  const canSubmit = isCurrentUserAssignee && execution.status === 'IN_PROGRESS';
 
   /* 查找上一节点执行实例 */
   const predecessorNodeIds = nodeConfig?.predecessorNodeIds ?? [];
@@ -194,18 +197,26 @@ export default function NodeDetailPanel({
   const prevNodeReviewable =
     prevExecution !== null &&
     (prevExecution.status === 'IN_PROGRESS' || prevExecution.status === 'COMPLETED');
+  const canReviewPreviousNode = isCurrentUserAssignee && prevNodeReviewable;
+  const canUploadArtifacts =
+    isCurrentUserAssignee && execution.status !== 'COMPLETED' && execution.status !== 'PENDING';
 
   return (
     <>
-      <div className="node-detail-panel">
+      <div className="node-detail-panel" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 80px)' }}>
         {/* 面板标题 */}
         <div className="node-detail-panel__header">
-          <Space>
-            <Title level={5} style={{ margin: 0, fontSize: 15 }}>
-              {execution.nodeName}
-            </Title>
-            <Tag color={statusCfg.color} style={{ borderRadius: 6, fontWeight: 500 }}>{statusCfg.label}</Tag>
-          </Space>
+          <div className="node-detail-panel__header-main">
+            <div>
+              <Title level={5} style={{ margin: 0, fontSize: 15 }}>
+                {execution.nodeName}
+              </Title>
+              <Text className="node-detail-panel__header-subtitle">{execution.nodeId}</Text>
+            </div>
+            <Tag color={statusCfg.color} style={{ borderRadius: 999, fontWeight: 600 }}>
+              {statusCfg.label}
+            </Tag>
+          </div>
           <Button
             type="text"
             size="small"
@@ -220,6 +231,30 @@ export default function NodeDetailPanel({
 
         {/* 面板内容 */}
         <div className="node-detail-panel__body">
+          <div className="node-detail-overview">
+            <div className="node-detail-overview__card">
+              <ClockCircleOutlined />
+              <div>
+                <span className="node-detail-overview__label">状态</span>
+                <strong>{statusCfg.label}</strong>
+              </div>
+            </div>
+            <div className="node-detail-overview__card">
+              <TeamOutlined />
+              <div>
+                <span className="node-detail-overview__label">负责人</span>
+                <strong>{execution.assignees.length || 0} 人</strong>
+              </div>
+            </div>
+            <div className="node-detail-overview__card">
+              <FileTextOutlined />
+              <div>
+                <span className="node-detail-overview__label">输出物</span>
+                <strong>{requiredArtifacts.length} 项 / 必需 {requiredCount}</strong>
+              </div>
+            </div>
+          </div>
+
           {/* ─── 第一分区：节点基本信息 ─── */}
           <Divider orientation="left" style={{ fontSize: 13, margin: '0 0 12px 0', fontWeight: 600 }}>
             节点信息
@@ -264,8 +299,18 @@ export default function NodeDetailPanel({
             )}
           </Descriptions>
 
+          {!isCurrentUserAssignee && (
+            <Alert
+              type="info"
+              showIcon
+              message="当前为只读查看模式"
+              description="你不是该节点参与者，可以查看节点信息，但不能执行开始、提交、审核或文档绑定操作。"
+              style={{ marginBottom: 16, borderRadius: 'var(--radius-md)' }}
+            />
+          )}
+
           {/* ─── 第二分区：审核上一节点产物 ─── */}
-          {prevNodeReviewable && prevExecution && (
+          {canReviewPreviousNode && prevExecution && (
             <>
               <Divider orientation="left" style={{ fontSize: 13, margin: '12px 0', fontWeight: 600, color: 'var(--color-info)' }}>
                 审核上一节点产物
@@ -343,17 +388,17 @@ export default function NodeDetailPanel({
                   <List.Item
                     className={isMissing ? 'artifact-item-missing' : (execution.status === 'COMPLETED' ? 'artifact-item-bound' : '')}
                     style={{ padding: '8px 12px', marginBottom: 6, borderRadius: 'var(--radius-md)' }}
-                    actions={[
+                    actions={!canUploadArtifacts ? [] : [
                       isMissing ? (
                         <Button key="upload" size="small" type="primary" danger
                           icon={<FileAddOutlined />} onClick={() => setUploadOpen(true)}>
                           补齐
                         </Button>
-                      ) : execution.status !== 'COMPLETED' && execution.status !== 'PENDING' ? (
+                      ) : (
                         <Button key="upload" size="small" icon={<FileAddOutlined />} onClick={() => setUploadOpen(true)}>
                           绑定
                         </Button>
-                      ) : null,
+                      ),
                     ]}
                   >
                     <List.Item.Meta
@@ -435,7 +480,7 @@ export default function NodeDetailPanel({
 
             {execution.status === 'PENDING' && (
               <div style={{ textAlign: 'center', padding: '16px 0' }}>
-                <div style={{ fontSize: 32, opacity: 0.4, marginBottom: 8 }}>⏳</div>
+                <ClockCircleOutlined style={{ fontSize: 32, opacity: 0.45, marginBottom: 8, color: 'var(--color-text-muted)' }} />
                 <Text type="secondary" style={{ display: 'block' }}>
                   等待前置节点完成后自动解锁…
                 </Text>
@@ -443,7 +488,7 @@ export default function NodeDetailPanel({
             )}
 
             {/* 上传文档快捷入口 */}
-            {execution.status !== 'COMPLETED' && execution.status !== 'PENDING' && requiredArtifacts.length > 0 && (
+            {canUploadArtifacts && requiredArtifacts.length > 0 && (
               <>
                 <Divider style={{ margin: '14px 0' }} />
                 <Button block icon={<FileAddOutlined />} onClick={() => setUploadOpen(true)}
@@ -458,7 +503,7 @@ export default function NodeDetailPanel({
 
       {/* 文档上传弹窗 */}
       <DocumentUploadModal
-        open={uploadOpen}
+        open={uploadOpen && canUploadArtifacts}
         projectId={projectId}
         executionId={executionId!}
         requirements={requiredArtifacts}

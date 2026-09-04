@@ -22,6 +22,28 @@ npm run build && npm run start:prod
 
 服务默认监听 `http://localhost:3000`，所有接口统一前缀 `/api/v1`。
 
+健康检查：`GET /api/v1/health`  
+Swagger 文档：`GET /api-docs`
+
+---
+
+## 环境变量
+
+请先基于 `.env.example` 创建本地环境变量。
+
+| 变量名 | 用途 | 默认值（开发） |
+| --- | --- | --- |
+| `NODE_ENV` | 运行环境标识 | `development` |
+| `PORT` | API 监听端口 | `3000` |
+| `FRONTEND_URL` | CORS 白名单前端地址 | `http://localhost:5173` |
+| `DB_URL` | 数据源连接描述（当前以内存为主） | `memory://local-store` |
+| `JWT_SECRET` | Access Token 签名密钥（生产必填） | 无 |
+| `JWT_EXPIRES_IN` | Access Token 过期时间 | `1h` |
+| `JWT_REFRESH_SECRET` | Refresh Token 签名密钥（生产必填） | 无 |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh Token 过期时间 | `7d` |
+
+注意：生产环境下若缺少 `JWT_SECRET` 将拒绝启动。
+
 ---
 
 ## 鉴权说明（JWT Bearer）
@@ -45,9 +67,19 @@ curl -s -X POST http://localhost:3000/api/v1/auth/token \
 ```json
 {
   "accessToken": "<jwt>",
+  "refreshToken": "<jwt>",
   "tokenType": "Bearer",
-  "expiresIn": "1h"
+  "expiresIn": "1h",
+  "refreshExpiresIn": "7d"
 }
+```
+
+刷新访问令牌：
+
+```bash
+curl -s -X POST http://localhost:3000/api/v1/auth/token/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"<refresh-jwt>"}' | jq '.data'
 ```
 
 ---
@@ -196,6 +228,8 @@ curl -i http://localhost:3000/api/v1/projects/$PROJECT_A/documents \
 }
 ```
 
+说明：健康检查 `GET /api/v1/health` 为探针兼容端点，直接返回 `{ "status": "ok" }`（不包裹 `data`）。
+
 **错误：**
 
 ```json
@@ -203,9 +237,61 @@ curl -i http://localhost:3000/api/v1/projects/$PROJECT_A/documents \
   "code": "INVALID_STATE_TRANSITION",
   "message": "当前状态（PENDING）不允许执行开始操作",
   "requestId": "uuid-v4",
-  "details": []
+  "details": {
+    "items": [],
+    "path": "/api/v1/executions/xxx/start",
+    "method": "POST",
+    "timestamp": "2026-05-01T00:00:00.000Z"
+  }
 }
 ```
+
+---
+
+## 测试命令
+
+```bash
+# 单元测试
+npm test
+
+# e2e（含健康检查）
+npm run test:e2e
+```
+
+---
+
+## 数据初始化与清理
+
+```bash
+# 开发态 seed（通过 API 注入）
+npm run seed:dev
+
+# 测试数据重置提示脚本
+npm run reset:test
+```
+
+说明：当前为内存存储，重启 API 即可清空数据；切换 PostgreSQL 后请在脚本中实现真实 SQL 清理。
+
+---
+
+## 生产部署 Checklist
+
+1. 安装依赖：`npm install --omit=dev`
+2. 准备环境变量：至少配置 `NODE_ENV=production`、`PORT`、`JWT_SECRET`、`JWT_REFRESH_SECRET`、`DB_URL`
+3. 构建：`npm run build`
+4. 启动：`npm run start:prod`
+5. 验证：访问 `GET /api/v1/health` 应返回 `{\"status\":\"ok\"}`
+6. 验证：访问 `GET /api-docs` 可打开 Swagger 文档
+7. 验证：核心 API（项目创建、流程提交、文档绑定）具备 2xx/4xx 明确状态码返回
+
+---
+
+## 已知限制与后续改进
+
+1. 当前存储层为内存实现，重启丢数据；正式环境需切换 PostgreSQL + Repository 模式。
+2. 速率限制目前为单实例内存桶，集群部署需替换为 Redis 限流。
+3. 目前未实现 SQL 注入防护中间件（因尚未引入 SQL 层）；切换 PostgreSQL 时应强制参数化查询。
+4. 缓存策略尚未启用（后续可在读取密集接口引入 Redis 缓存）。
 
 ---
 

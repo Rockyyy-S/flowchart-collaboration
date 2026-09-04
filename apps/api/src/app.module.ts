@@ -9,6 +9,7 @@ import { ExecutionsModule } from './executions/executions.module';
 import { AuthModule } from './auth/auth.module';
 import { TeamsModule } from './teams/teams.module';
 import { FlowchartsModule } from './flowcharts/flowcharts.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { FlowchartsModule } from './flowcharts/flowcharts.module';
     AuditModule,         // 审计日志服务
     NotificationsModule, // 通知占位服务
     TeamsModule,         // POST/GET/DELETE /teams 团队管理
+    HealthModule,        // GET /health 健康检查
     ProjectsModule,      // POST/GET/DELETE /projects
     FlowsModule,         // GET/PUT /projects/:id/flows/*（向后兼容）
     FlowchartsModule,    // GET/POST/DELETE /projects/:id/flowcharts + /flowcharts/*

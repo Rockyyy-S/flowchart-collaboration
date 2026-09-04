@@ -1,6 +1,6 @@
 # flowchart-collaboration 前端实现总结
 
-> 版本：v0.3 | 日期：2026-04-16 | 角色：前端专家 | 状态：真实可编辑流程画布已落地（文档同步）
+> 版本：v0.4 | 日期：2026-04-29 | 角色：前端专家 | 状态：主工作区 IA 与视觉语义重构完成（Top Bar/Activity Bar/Side Panel/Canvas/Node Detail 三分区）
 
 ---
 
@@ -187,3 +187,48 @@ npm run dev                # 监听 http://localhost:5173
 5. 切回执行模式，点击节点仍可打开详情抽屉并执行原有操作。
 
 已知风险：当前画布为轻量自实现，不含缩放、迷你地图、复杂路由线与批量操作；若后续需要高级编排能力，可在现有模式与保存协议不变前提下，逐步替换为 LogicFlow 引擎。
+
+---
+
+## 八、2026-04-29 UX/UI 规范对齐重构（本次）
+
+### 8.1 改动目标与结果
+
+| 目标 | 结果 |
+| --- | --- |
+| 依据 UX/UI 规范重构主工作区信息架构 | ✅ 完成：形成 Top Bar + Activity Bar + Side Panel + Canvas + Status Bar 结构 |
+| 完成团队管理面板与新建团队弹窗可用链路 | ✅ 完成：`TeamManagement` 支持 Side Panel 嵌入模式，保留原弹窗交互 |
+| 完成通知入口（Top Bar Popover）与侧栏通知视图 | ✅ 完成：顶部通知 Popover + 左侧通知模式双入口 |
+| 节点卡片统一语义（START/END/TASK_SIMPLE/TASK_BRANCH）与状态可视化 | ✅ 完成：节点统一圆角矩形，按类型/状态区分语义 |
+| 右侧节点详情三分区与审核通过/拒绝交互可用 | ✅ 完成：保留并强化三分区及 approve/reject 链路 |
+| 样式体系由变量驱动 | ✅ 完成：新增/复用 CSS 变量，减少散落硬编码 |
+
+### 8.2 关键实现与原因
+
+- 重构 [apps/web/src/pages/MainWorkspace.tsx](../../apps/web/src/pages/MainWorkspace.tsx)：
+  - 新增 `ActivityKey` 路由状态（项目/搜索/团队/通知）与侧栏展开逻辑。
+  - 增加平板策略（1024-1279）：Side Panel 采用 overlay，不挤压画布。
+  - 新增底部 `Status Bar`，实时展示节点总数、进行中与完成比。
+- 重构 [apps/web/src/components/layout/AppLayout.tsx](../../apps/web/src/components/layout/AppLayout.tsx)：
+  - 去除 Slogan 轮播，新增全局搜索输入、通知 Popover、用户菜单。
+  - 保留开发态令牌获取链路，不改后端接口契约。
+- 扩展 [apps/web/src/components/TeamManagement/index.tsx](../../apps/web/src/components/TeamManagement/index.tsx)：
+  - 支持 `embedded` 模式，满足 Side Panel 团队管理面板承载。
+  - 保留新建团队/添加成员/删除团队弹窗与权限控制。
+- 重构 [apps/web/src/components/FlowCanvas/index.tsx](../../apps/web/src/components/FlowCanvas/index.tsx)：
+  - 节点类型统一到 `START/END/TASK_SIMPLE/TASK_BRANCH`，兼容旧 `TASK` 自动映射。
+  - 节点视觉改为统一圆角矩形语义，新增类型标签与分支节点 `子图` 标识。
+  - 补齐 `REJECTED` 状态文案与图标；编辑工具栏新增“节点”下拉创建入口。
+- 更新 [apps/web/src/index.css](../../apps/web/src/index.css)：
+  - 新增 Activity Bar、Side Panel、Team 嵌入面板、状态栏与通知样式。
+  - 统一节点类型语义样式与状态色（含 REJECTED），调整工具栏为顶部布局。
+
+### 8.3 验证步骤与风险
+
+1. 在 `apps/web` 执行 `npm run build`，确认打包通过。
+2. 打开主界面，验证 Top Bar（搜索/通知/用户菜单）与左侧 Activity Bar 四入口。
+3. 在项目侧栏打开流程图标签，验证 Tab 切换、Canvas 绘制、Status Bar 统计。
+4. 点击节点，验证右侧三分区（基本信息/审核上游/当前操作）与通过/拒绝链路。
+5. 切换编辑模式，验证“节点”下拉创建、连线、保存草稿、状态渲染。
+
+已知风险：通知仍为前端派生/本地展示，后续需与后端真实通知列表（轮询或推送）对齐；移动端（<768）仍非 MVP 支持范围。

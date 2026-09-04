@@ -26,6 +26,14 @@ export class RequestIdInterceptor implements NestInterceptor {
     request.requestId = requestId;
     response.setHeader('X-Request-Id', requestId);
 
+    // 健康检查用于探针约定，保持返回体为 { status: 'ok' }，不做 data 包装。
+    if (
+      request.originalUrl === '/api/v1/health' ||
+      request.url === '/api/v1/health'
+    ) {
+      return next.handle();
+    }
+
     return next.handle().pipe(
       map((data) => ({
         data,

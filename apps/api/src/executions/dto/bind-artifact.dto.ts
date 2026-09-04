@@ -1,10 +1,16 @@
-import { IsString, IsOptional, IsNotEmpty, MaxLength, IsUrl } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty, MaxLength, IsUrl, Matches } from 'class-validator';
+import {
+  GENERIC_ID_PATTERN,
+} from '../../common/constants/validation-patterns';
 
 export class BindArtifactDto {
   /** 对应 NodeConfig.requiredArtifacts[].id，必须稳定可追溯 */
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
+  @Matches(GENERIC_ID_PATTERN, {
+    message: 'requirementId 格式不合法',
+  })
   requirementId: string;
 
   /**
@@ -14,6 +20,9 @@ export class BindArtifactDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
+  @Matches(GENERIC_ID_PATTERN, {
+    message: 'documentId 格式不合法',
+  })
   documentId?: string;
 
   /**

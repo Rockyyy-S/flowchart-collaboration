@@ -1,0 +1,6 @@
+.history/
+.github/
+.codex/
+.playwright-mcp/
+raw-data/
+docs/

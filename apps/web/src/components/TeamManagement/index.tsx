@@ -17,6 +17,7 @@ import {
   List,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Spin,
   Tag,
@@ -45,22 +46,24 @@ import type { Team } from '../../api/types';
 const { Text, Title } = Typography;
 
 interface TeamManagementProps {
-  /** 面板是否可见 */
-  open: boolean;
-  /** 关闭回调 */
-  onClose: () => void;
+  /** Drawer 模式下是否可见 */
+  open?: boolean;
+  /** Drawer 模式关闭回调 */
+  onClose?: () => void;
+  /** 是否以内嵌面板渲染（用于左侧 Side Panel） */
+  embedded?: boolean;
 }
 
 /**
  * 团队管理 Drawer 组件
  */
-export default function TeamManagement({ open, onClose }: TeamManagementProps) {
+export default function TeamManagement({ open, onClose, embedded = false }: TeamManagementProps) {
   const queryClient = useQueryClient();
   const currentUserId = getTokenSnapshot()?.userId;
 
   /* 新建团队弹窗状态 */
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [createForm] = Form.useForm<{ name: string; description?: string; memberIds?: string }>();
+  const [createForm] = Form.useForm<{ name: string; description?: string; memberIds?: string[] }>();
 
   /* 添加成员弹窗状态 */
   const [addMemberModal, setAddMemberModal] = useState<{ open: boolean; teamId: string } | null>(null);
@@ -70,9 +73,18 @@ export default function TeamManagement({ open, onClose }: TeamManagementProps) {
   const { data: teams = [], isLoading } = useQuery({
     queryKey: ['teams'],
     queryFn: getMyTeams,
-    enabled: open, // 仅在面板打开时拉取
+    enabled: embedded ? true : !!open, // Drawer 模式仅打开时拉取，内嵌模式常驻
     staleTime: 15000,
   });
+
+  /* 从所有团队中提取所有成员ID（用于选择器） */
+  const availableMemberIds = useMemo(() => {
+    const memberSet = new Set<string>();
+    teams.forEach((team) => {
+      team.memberIds.forEach((id) => memberSet.add(id));
+    });
+    return Array.from(memberSet).sort();
+  }, [teams]);
 
   /** 刷新团队列表 */
   function invalidateTeams() {
@@ -126,13 +138,8 @@ export default function TeamManagement({ open, onClose }: TeamManagementProps) {
   async function handleCreateTeam() {
     try {
       const values = await createForm.validateFields();
-      /* 将逗号分隔的成员 ID 字符串转为数组 */
-      const memberIds = values.memberIds
-        ? values.memberIds
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
+      /* tags 输入直接返回数组，这里只做清洗。 */
+      const memberIds = values.memberIds?.map((item) => item.trim()).filter(Boolean);
       createMut.mutate({ name: values.name.trim(), description: values.description?.trim(), memberIds });
     } catch {
       // 表单验证失败，不做处理
@@ -277,30 +284,23 @@ export default function TeamManagement({ open, onClose }: TeamManagementProps) {
     children: renderTeamContent(team),
   }));
 
-  return (
+  const content = (
     <>
-      {/* 团队管理 Drawer */}
-      <Drawer
-        title={
-          <Space>
-            <TeamOutlined />
-            <span>团队管理</span>
-          </Space>
-        }
-        open={open}
-        onClose={onClose}
-        width={480}
-        extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={() => setCreateModalOpen(true)}
-          >
-            新建团队
-          </Button>
-        }
-      >
+      <div className="team-panel-header">
+        <Space>
+          <TeamOutlined />
+          <span>团队管理</span>
+        </Space>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          size="small"
+          onClick={() => setCreateModalOpen(true)}
+        >
+          新建
+        </Button>
+      </div>
+      <div className="team-panel-body">
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: 48 }}>
             <Spin />
@@ -310,7 +310,7 @@ export default function TeamManagement({ open, onClose }: TeamManagementProps) {
             <TeamOutlined style={{ fontSize: 48, opacity: 0.3, display: 'block', marginBottom: 12 }} />
             <Title level={5} type="secondary">暂无团队</Title>
             <Text type="secondary" style={{ fontSize: 13 }}>
-              点击右上角「新建团队」创建你的第一个团队
+              点击上方「新建」创建你的第一个团队
             </Text>
           </div>
         ) : (
@@ -320,7 +320,57 @@ export default function TeamManagement({ open, onClose }: TeamManagementProps) {
             accordion={false}
           />
         )}
-      </Drawer>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      {embedded ? (
+        <div className="team-panel-embedded">{content}</div>
+      ) : (
+        <Drawer
+          title={
+            <Space>
+              <TeamOutlined />
+              <span>团队管理</span>
+            </Space>
+          }
+          open={open}
+          onClose={onClose}
+          width={480}
+          extra={
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              size="small"
+              onClick={() => setCreateModalOpen(true)}
+            >
+              新建团队
+            </Button>
+          }
+        >
+          {isLoading ? (
+            <div style={{ textAlign: 'center', padding: 48 }}>
+              <Spin />
+            </div>
+          ) : teams.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-muted)' }}>
+              <TeamOutlined style={{ fontSize: 48, opacity: 0.3, display: 'block', marginBottom: 12 }} />
+              <Title level={5} type="secondary">暂无团队</Title>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                点击右上角「新建团队」创建你的第一个团队
+              </Text>
+            </div>
+          ) : (
+            <Collapse
+              items={collapseItems}
+              ghost
+              accordion={false}
+            />
+          )}
+        </Drawer>
+      )}
 
       {/* 新建团队弹窗 */}
       <Modal
@@ -354,9 +404,14 @@ export default function TeamManagement({ open, onClose }: TeamManagementProps) {
           <Form.Item
             label="初始成员 ID"
             name="memberIds"
-            extra="多个成员 ID 用逗号分隔，例如：user-001,user-002"
+            extra="选择初始团队成员。"
           >
-            <Input placeholder="user-001,user-002（可选）" />
+            <Select
+              mode="multiple"
+              placeholder="请选择初始成员"
+              options={availableMemberIds.map((id) => ({ value: id, label: id }))}
+              notFoundContent={<Text type="secondary" style={{ fontSize: 12 }}>暂无可选成员</Text>}
+            />
           </Form.Item>
         </Form>
       </Modal>
@@ -379,9 +434,13 @@ export default function TeamManagement({ open, onClose }: TeamManagementProps) {
           <Form.Item
             label="成员用户 ID"
             name="memberId"
-            rules={[{ required: true, message: '请输入成员 ID' }]}
+            rules={[{ required: true, message: '请选择要添加的成员' }]}
           >
-            <Input placeholder="例如：user-abc123" autoFocus />
+            <Select
+              placeholder="请选择成员"
+              options={availableMemberIds.map((id) => ({ value: id, label: id }))}
+              notFoundContent={<Text type="secondary" style={{ fontSize: 12 }}>暂无可选成员</Text>}
+            />
           </Form.Item>
         </Form>
       </Modal>

@@ -1,6 +1,6 @@
 # flowchart-collaboration Context Doc
 
-> 版本：v2.9 | 日期：2026-04-29 | 负责角色：前端专家 | 状态：前端全面改造完成（对接后端第二轮改造）：新增团队管理 Drawer（AppLayout 头部）、多标签流程图画布（MainWorkspace 重构）、NodeDetailPanel 三分区重构（节点信息/审核上一节点/当前节点操作）、ProjectListPanel 支持展开流程图列表 + 项目删除、API 层对接 Teams/Flowcharts/approve/reject 接口、REJECTED 状态完整支持、权限检查（仅参与者可打开节点面板），TypeScript 零错误。
+> 版本：v3.9 | 日期：2026-05-01 | 负责角色：QA专家 | 状态：新增 Playwright 执行指南、快速参考卡与一键执行脚本，并已挂载到 QA 阶段与 QA 门禁产出链接。
 
 ## 元信息
 
@@ -31,12 +31,12 @@
 |---|---|---|---|---|
 | 需求澄清 | ✅完成 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) | 2026-04-13 | PRD v1.0 已形成需求基线。 |
 | 架构边界 | ✅完成 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) | 2026-04-14 | v0.1 MVP 架构边界已冻结，可支持前后端并行开发。 |
-| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-04-29 | **第二轮前端全面改造**（对接后端 v2.8 改造）：① 新增 TeamManagement Drawer（AppLayout 头部触发）；② MainWorkspace 重构为多标签模式（openedFlowcharts + Tabs）；③ NodeDetailPanel 改为三分区（节点信息 / 审核上一节点产物 / 当前节点操作），支持审核通过/拒绝及 REJECTED 状态 Alert；④ ProjectListPanel 支持展开项目查看流程图列表、删除项目（OWNER 权限）、创建项目时绑定团队（必填）+ 可选同步创建流程图；⑤ API 层新增 teams.ts、flowcharts.ts，executions.ts 新增 approve/reject，projects.ts 新增 deleteProject；⑥ 权限检查：仅 assignees 中的用户点击节点可打开面板；⑦ TypeScript 零错误。 |
-| 后端实现 | ✅完成 | [flowchart-collaboration-backend-summary](../implementation/flowchart-collaboration-backend-summary.md) | 2026-04-28 | 完成第二轮后端全面改造（依据《一些定义和逻辑描述.md》）：新增 TeamsModule（CRUD + 成员管理）、FlowchartsModule（含子流程图）；Project 实体新增 teamId 绑定；NodeConfig.type 规范化为联合类型；NodeExecution 新增 flowchartId/rejectionReason/reviewResult；ExecutionStatus 新增 REJECTED；新增审核/回退接口 approve/reject；ID 格式规范化（generateId 工具）；TypeScript 编译零错误。 |
-| QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) | 2026-04-16 | 已完成前端流程图编辑器专项回归 + UI 美化专项回归（v0.9）：本次美化改动未发现新增阻塞级缺陷（P1×1 孤立文件，P2×2 体验小问题）；但运行时联调证据仍未补齐，QA 门禁❌。 |
+| 前端实现 | ✅完成 | [flowchart-collaboration-frontend-summary](../implementation/flowchart-collaboration-frontend-summary.md) | 2026-05-01 | **第五轮前端美化与集成 + 语义化 ID 收尾修复**：① 用户/团队选择改为下拉框（ProjectListPanel/FlowCanvas/TeamManagement 三处）；② 流程图创建API集成完整（项目创建时自动创建流程图，失败降级处理）；③ 工具栏改为单行 flex 布局（justify-content:space-between, gap:8px, 按钮统一32px高度）；④ 缩放控件右上角浮窗（position:absolute, top:12px, right:12px, 垂直排列三个按钮）；⑤ NodeDetailPanel 改 overflow-y:auto + max-height 约束（防止超界）；⑥ 相应 CSS 样式补齐；⑦ ProjectListPanel 的 DEMO_FLOW 节点 ID 全量切换为 node_{slug} 下划线规范并同步更新 predecessorNodeIds；⑧ TypeScript 诊断零新增错误。 |
+| 后端实现 | ✅完成 | [flowchart-collaboration-backend-summary](../implementation/flowchart-collaboration-backend-summary.md) | 2026-05-01 | 在 2026-04-28 基础上完成生产就绪增强：统一异常详情结构、全局请求日志与关键路径耗时、Swagger `/api-docs`、健康检查 `/api/v1/health`、JWT refresh、DTO 校验强化、全局限流、10MB body 限制、优雅停机、环境变量示例与测试脚本补齐。 |
+| QA 验证 | ✅完成 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md)、[playwright-execution-guide](../qa/playwright-execution-guide.md)、[playwright-quick-reference](../qa/playwright-quick-reference.md)、[run-playwright-tests](../../scripts/run-playwright-tests.ps1) | 2026-05-01 | 已补齐 Playwright 可执行交付包（执行指南 + 快速卡片 + 一键脚本），用于运行时联调证据采集与回归执行标准化。 |
 | 安全审查 | ✅完成 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) | 2026-04-16 | 第三轮复审完成：VUL-10/11/12/13 全部关闭，安全门禁通过（v0.5）。 |
-| 文档沉淀 | ✅完成 | [flowchart-collaboration-context](flowchart-collaboration-context.md)、[quick-reference-guide](../quick-reference-guide.md)、[flowchart-collaboration-user-guide](../user-docs/flowchart-collaboration-user-guide.md)、[flowchart-collaboration-maintenance-runbook](../ops/flowchart-collaboration-maintenance-runbook.md) | 2026-04-14 | MVP 文档沉淀完成：用户操作指南 + 维护运维手册已落地；2026-04-16 已同步真实流程画布与编辑模式说明。 |
-| 发布准备 | ❌阻塞 | [v0.1.0-release-note](../releases/v0.1.0-release-note.md) | 2026-04-15 | 已形成上线/回滚清单与灰度演练记录；安全门禁已通过（v0.5），当前仅阻塞项为 QA 运行时联调证据缺失。 |
+| 文档沉淀 | ✅完成 | [flowchart-collaboration-context](flowchart-collaboration-context.md)、[quick-reference-guide](../quick-reference-guide.md)、[flowchart-collaboration-user-guide](../user-docs/flowchart-collaboration-user-guide.md)、[flowchart-collaboration-maintenance-runbook](../ops/flowchart-collaboration-maintenance-runbook.md)、[flowchart-collaboration-deployment](../ops/flowchart-collaboration-deployment.md)、[flowchart-collaboration-go-live](../ops/flowchart-collaboration-go-live.md) | 2026-05-01 | 文档沉淀补齐运维交付双文档：部署指南 + 上线管理文档，覆盖从部署实施到发布治理与回滚复盘。 |
+| 发布准备 | ❌阻塞 | [v0.1.0-release-note](../releases/v0.1.0-release-note.md)、[README](../../README.md) | 2026-05-01 | 发布准备信息已补充根目录 README 总入口（v3.6）；当前仅阻塞项为 QA 运行时联调证据缺失。 |
 
 ## 质量门禁状态
 
@@ -44,7 +44,7 @@
 |---|---|---|---|
 | 需求门禁 | ✅通过 | PRD v1.0 已完成评审状态标记，可作为后续阶段输入。 | [flowchart-collaboration-prd](../requirements/flowchart-collaboration-prd.md) |
 | 架构门禁 | ✅通过 | 已完成 v0.1 架构边界文档，覆盖分层、契约、约束与里程碑。 | [flowchart-collaboration-architecture](../architecture/flowchart-collaboration-architecture.md) |
-| QA 门禁 | ❌未通过 | 本轮前端流程图编辑器回归 + UI 美化专项回归（v0.9）均确认：可视化画布、编辑能力、保存一致性、执行态面板兼容、TypeScript 零错误、draggingNodeId 清理完整、令牌 Dropdown 逻辑正确、贝塞尔曲线无 NaN 风险、CSS 类名一致；未发现新增阻塞级缺陷（P1×1 为孤立文件，P2×2 为体验小问题）；项目整体仍缺运行时联调证据，暂不满足放行条件。 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md) |
+| QA 门禁 | ❌未通过 | 本轮前端流程图编辑器回归 + UI 美化专项回归（v0.9）均确认：可视化画布、编辑能力、保存一致性、执行态面板兼容、TypeScript 零错误、draggingNodeId 清理完整、令牌 Dropdown 逻辑正确、贝塞尔曲线无 NaN 风险、CSS 类名一致；未发现新增阻塞级缺陷（P1×1 为孤立文件，P2×2 为体验小问题）；项目整体仍缺运行时联调证据，暂不满足放行条件。已新增 Playwright 执行指南与一键脚本用于补证执行。 | [flowchart-collaboration-test-report](../qa/flowchart-collaboration-test-report.md)、[playwright-execution-guide](../qa/playwright-execution-guide.md)、[playwright-quick-reference](../qa/playwright-quick-reference.md)、[run-playwright-tests](../../scripts/run-playwright-tests.ps1) |
 | 安全门禁 | ✅通过 | 三轮复审完成：VUL-01~13 全部关闭或降级，安全门禁通过。 | [flowchart-collaboration-security-review](../security/flowchart-collaboration-security-review.md) |
 | 发布门禁 | ❌未通过 | QA 仍阻塞（仅缺运行时联调证据），发布申请暂缓。 | [v0.1.0-release-note](../releases/v0.1.0-release-note.md) |
 
@@ -152,6 +152,46 @@
 - 涉及文件：`apps/web/src/components/FlowCanvas/index.tsx`、`apps/web/src/components/ProjectListPanel/index.tsx`、`apps/web/src/pages/MainWorkspace.tsx`、`apps/web/src/index.css`。
 - 完成交接：to_qa（回归验证底部操作区位置、模式切换权限、左栏折叠按钮对齐与交互一致性）。
 
+### 前端（2026-04-30 语义化节点ID改进）
+
+- **新建工具函数模块** `apps/web/src/utils/naming.ts`：
+  - `slugifyNodeName(name: string): string` —— 将节点名称转换为 slug 格式（小写+下划线），支持英文转小写、中文汉字转拼音（基础映射）、特殊字符删除、空格转下划线。
+  - `generateNodeId(name: string, existingNodeIds: Set<string>): string` —— 生成语义化节点ID，格式 `node_{slugified_name}`；若重复则自动追加日期时间戳后缀（`YYYYMMDD` 格式），再次重复时追加毫秒，确保全局唯一。
+  - `buildNodeIdSet(nodes: Array<{ id: string }>): Set<string>` —— 从现有节点列表构建ID集合，用于重复检查。
+- **FlowCanvas 集成新ID生成逻辑**：
+  - 导入新函数 `import { generateNodeId, buildNodeIdSet } from '../../utils/naming'`。
+  - `handleAddNodeConfirm()` 修改：用 `generateNodeId(values.name, buildNodeIdSet(nodes))` 替代旧的随机 ID 生成。
+  - `handleAddSubprocess()` 修改：用 `generateNodeId(newName, buildNodeIdSet(nodes))` 替代旧的随机 ID 生成。
+  - START 节点配对自动生成 END 节点时，用 `generateNodeId('结束', buildNodeIdSet([...nodes, newNode]))` 确保 END 节点ID独立且不重复。
+- **效果验证**：
+  - 节点名"DEV"生成 `node_dev`；"QA Test"生成 `node_qa_test`；特殊字符自动清理。
+  - 同名节点新增时第二次生成 `node_dev_20260430`（若不巧同日重复则追加毫秒后缀）。
+  - 右侧 NodeDetailPanel 显示新格式 nodeId；所有节点操作（拖拽、删除、连线）向后兼容。
+- **TypeScript 编译零错误**；无后端 API 变更，向后兼容历史节点ID。
+
+### 前端（2026-05-01 DEMO_FLOW 语义化 ID 规范修复）
+
+- 修复 `ProjectListPanel` 内置演示流程 `DEMO_FLOW` 的旧版连字符节点 ID，统一改为 `node_{slug}` 规范。
+- 节点 ID 更新为：`node_requirement_review`、`node_tech_review`、`node_dev`、`node_qa`、`node_deploy`。
+- 同步更新 `graphJson.edges` 与 `nodesConfig.predecessorNodeIds` 的全量引用，确保依赖链一致。
+- 前端 TypeScript 诊断结果：本次改动未引入新增错误。
+
+### 前端（2026-05-01 ProjectListPanel 初始化流程起始节点 ID 修复）
+
+- 修复 `ProjectListPanel` 的 `handleCreateProject()` 初始化流程图节点 ID：将 `node-start` 统一替换为 `node_start`。
+- 已同步更新两处引用：`graphJson.nodes[].id` 与 `nodesConfig[].nodeId`，确保新项目初始化数据符合下划线规范。
+- 前端 TypeScript 诊断结果：本次改动未引入新增错误。
+
+### 前端（2026-04-29 UX/UI 规范对齐重构）
+
+- 主工作区信息架构重构：实现 Top Bar + Activity Bar + Side Panel + Canvas + Status Bar 五段结构，支持项目/搜索/团队/通知四类侧栏视图。
+- 顶部导航重构：去除 Slogan，新增全局搜索输入、通知 Popover、用户菜单（含获取开发令牌/退出登录）。
+- 团队管理面板升级：`TeamManagement` 支持嵌入式 Side Panel，保留新建团队/成员管理/删除团队权限控制和弹窗链路。
+- 节点语义统一：`FlowCanvas` 将节点类型规范到 `START/END/TASK_SIMPLE/TASK_BRANCH`，兼容旧 `TASK` 自动映射；节点统一圆角矩形视觉并按类型/状态标识。
+- 编辑模式工具栏增强：新增“节点”下拉创建入口（选择四类节点），保留双击画布新增、连线、删除、保存草稿能力。
+- 状态可视化补齐：补全 `REJECTED` 文案、图标与样式；右侧 `NodeDetailPanel` 三分区与审核通过/拒绝链路维持可操作。
+- 本轮不涉及后端 API 契约与数据库变更。
+
 ### 前端（2026-04-16 流程画布核心功能增强）
 
 - 子流程按钮与并行分支：编辑模式下 TASK 节点（矩形及多人圆形）hover 时右侧显示"+"按钮（22px 圆形），点击弹出 Dropdown 菜单可选"向上/向下添加子流程"；子流程节点自动创建在主流程节点左侧偏移 -250px 位置并自动建立连线关系。
@@ -221,6 +261,24 @@
 - **ID 规范化工具**：新增 `generateId(prefix)` 工具函数（`apps/api/src/common/utils/generate-id.util.ts`）；Team/Project/Flowchart 均使用带前缀短码 ID。
 - **TypeScript 编译零错误**，不引入新 npm 依赖，不改动前端代码。
 
+### 后端（2026-05-01 生产就绪增强）
+
+- **错误处理与日志统一**：增强 `HttpExceptionFilter`，非 5xx 使用 WARN、5xx 使用 ERROR；错误响应扩展为 `details.items/path/method/timestamp`；新增 `RequestLoggingInterceptor` 输出结构化 `request.start/success/error` 日志并记录 `durationMs`，自动脱敏 token/password/secret。
+- **启动与运行治理**：`main.ts` 增加 10MB body 限制、全局限流守卫、Swagger 文档挂载（`/api-docs`）、环境启动日志（端口/环境/数据源）、`SIGTERM/SIGINT` 优雅停机；新增健康检查端点 `GET /api/v1/health` 返回 `{ "status": "ok" }`。
+- **认证链路增强**：`AuthService` 增加 refresh token 机制与 tokenType 校验，新增 `POST /api/v1/auth/token/refresh`；Access/Refresh 过期时间与密钥全部支持环境变量配置。
+- **DTO 校验强化**：补齐 `Matches/IsIn/MaxLength/Array*` 等约束，覆盖 `auth/projects/teams/flowcharts/flows/executions/documents`；将文档大小上限收敛为 10MB。
+- **契约文档化**：主要 Controller 补齐 `@ApiTags/@ApiOperation/@ApiResponse/@ApiParam/@ApiQuery`，Swagger 可直接用于联调与验收。
+- **测试与脚本**：新增 Jest 单测与 e2e 基建（含 health e2e）；补充 `seed:dev`、`reset:test` 脚本；新增 `.env.example` 与 README 生产部署清单。
+
+## 运维交付
+
+- 已新增运维部署文档：[flowchart-collaboration-deployment](../ops/flowchart-collaboration-deployment.md)
+  - 覆盖部署前置条件、本地环境搭建、单机部署（PM2/systemd）、Nginx 反向代理、日志监控、故障排查与回滚策略。
+  - 明确当前 MVP 内存存储限制，并给出 PostgreSQL/对象存储/CI-CD/容器化扩展建议。
+- 已新增上线管理文档：[flowchart-collaboration-go-live](../ops/flowchart-collaboration-go-live.md)
+  - 覆盖发布前检查清单、语义化版本流程、上线窗口与角色职责、灰度发布策略、分阶段上线步骤、风险控制、24h 监控告警、事后复盘模板。
+  - 已导入 context 现存风险口径（运行时联调证据、内存持久化、事务一致性、流程语义残余风险），用于发布 Go/No-Go 判定。
+
 ## 版本历史
 
 | 日期 | 版本 | 角色 | 变更摘要 | 备注 |
@@ -252,3 +310,12 @@
 | 2026-04-17 | v2.5 | 前端专家 | 补齐前端 vitest/jsdom 最小测试基建，并新增 FlowCanvas END 节点拖拽压力回归用例，覆盖“mouseup 清空 ref 后仍有 mousemove”竞态场景，验证组件不崩溃。 | 交接 to_qa |
 | 2026-04-17 | v2.6 | 前端专家 | 完成项目面板底部操作区改造：将“新建/快速体验/模式切换”统一下沉到 ProjectListPanel 底部；模式切换改为单开关“开启编辑模式”；FlowCanvas 移除 Segmented 模式入口并保持 OWNER 权限约束联动。 | 交接 to_qa |
 | 2026-04-17 | v2.7 | 前端专家 | 完成模式切换与操作区位置修正：模式文案改为“编辑模式”；模式开关迁移到 FlowCanvas 底部并与删除/连线同区；移除左栏重复开关并将折叠按钮调整到头部最右侧垂直居中；TS 诊断无新增报错。 | 交接 to_qa |
+| 2026-04-29 | v3.0 | 前端专家 | 完成 UX/UI 规范对齐重构：Top Bar 工具化导航、Activity Bar + Side Panel、团队管理嵌入面板、通知 Popover、状态栏、节点语义统一（START/END/TASK_SIMPLE/TASK_BRANCH）与 REJECTED 可视化，保持审核通过/拒绝链路可用。 | 交接 to_qa / to_security / to_docs |
+| 2026-04-30 | v3.2 | 前端专家 | 完成语义化节点ID改进：新建 `apps/web/src/utils/naming.ts` 工具模块，实现 `slugifyNodeName()` 支持中文汉字转拼音和 `generateNodeId()` 重复检查与时间戳后缀逻辑；FlowCanvas 三处节点创建逻辑改为使用新函数（handleAddNodeConfirm/handleAddSubprocess/START配对END）；TypeScript 编译零错误；向后兼容。 | 待 QA 验证与安全复审 |
+| 2026-05-01 | v3.3 | 前端专家 | 完成节点ID格式规范化：① 补充 `PINYIN_MAP` 常见汉字（"结、束、子、流、程"等15+个），确保中文节点名能正确转换为 slug；② 修正 END 节点生成方式，改用 `generateNodeId('END', ...)` 替代 `generateNodeId('结束', ...)`，确保 END 节点 ID 为 `node_end`；③ 所有节点 ID 严格遵循 `{prefix}_{slug}` 或 `{prefix}_{slug}_{timestamp}` 格式（示例：`node_dev`、`node_qa_test`、`node_start`、`node_end`）；④ TypeScript 编译零错误；⑤ 更新 context doc 版本记录。 | 交接 to_qa / to_docs 验收确认 |
+| 2026-05-01 | v3.4 | 后端专家 | 完成后端生产就绪增强：主流程新增健康检查与 Swagger，统一异常与结构化日志链路，补齐 JWT 刷新令牌机制、全局限流、10MB body 限制、优雅停机、DTO 校验强化，新增 `.env.example`、测试脚本与 seed/reset 脚本。 | 交接 to_qa / to_security / to_docs |
+| 2026-05-01 | v3.5 | 文档撰写员 | 新增运维交付双文档：[部署指南](../ops/flowchart-collaboration-deployment.md) 与 [上线管理文档](../ops/flowchart-collaboration-go-live.md)；并在 Context Doc 增加“运维交付”章节、同步文档沉淀阶段产出链接。 | 交接发布经理/运维工程师执行落地 |
+| 2026-05-01 | v3.6 | 文档撰写员 | 新增项目根目录总入口文档 [README](../../README.md)，覆盖快速开始、技术栈、文档导航、开发命令、限制与迭代方向；并将 README 链接与版本号补充到发布准备阶段。 | 交接发布经理同步对外入口口径 |
+| 2026-05-01 | v3.7 | 前端专家 | 修复 `ProjectListPanel` 中 DEMO_FLOW 旧节点 ID：`node-req/node-tech/node-dev/node-qa/node-deploy` 全量切换为 `node_requirement_review/node_tech_review/node_dev/node_qa/node_deploy`，并同步更新 edges 与 predecessorNodeIds 引用，完成语义化 ID 规范对齐。 | 交接 to_qa / to_docs 验收确认 |
+| 2026-05-01 | v3.8 | 前端专家 | 修复 `ProjectListPanel` 的 `handleCreateProject()` 新项目初始化流程节点 ID：`node-start` 替换为 `node_start`，并同步更新 `graphJson.nodes[].id` 与 `nodesConfig[].nodeId` 两处引用；TypeScript 诊断无新增错误。 | 交接 to_qa / to_docs 验收确认 |
+| 2026-05-01 | v3.9 | QA专家 | 新增 [playwright-execution-guide](../qa/playwright-execution-guide.md)、[playwright-quick-reference](../qa/playwright-quick-reference.md) 与 [run-playwright-tests](../../scripts/run-playwright-tests.ps1)，并将三份产物挂载至 QA 阶段与 QA 门禁产出链接。 | 交接发布经理用于放行评估前执行与证据采集 |

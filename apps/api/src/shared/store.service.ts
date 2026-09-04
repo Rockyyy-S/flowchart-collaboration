@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Scope } from '@nestjs/common';
 import {
   Team,
   Project,
@@ -21,7 +21,8 @@ import {
  * 3. 上层 Service 方法签名保持不变，仅替换此层的 CRUD 实现
  * 4. 将 auditLogs 数组替换为写 audit_logs 表的逻辑
  */
-@Injectable()
+// Nest 中 Scope.DEFAULT 即单例作用域（SINGLETON 语义）。
+@Injectable({ scope: Scope.DEFAULT })
 export class StoreService {
   /** 团队主数据 */
   readonly teams: Map<string, Team> = new Map();

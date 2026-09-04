@@ -3,8 +3,13 @@ import {
   IsNotEmpty,
   IsOptional,
   IsDateString,
+  Matches,
   MaxLength,
 } from 'class-validator';
+import {
+  NODE_ID_PATTERN,
+  USER_ID_PATTERN,
+} from '../../common/constants/validation-patterns';
 
 /** 创建子流程图请求体 */
 export class CreateSubFlowchartDto {
@@ -12,6 +17,9 @@ export class CreateSubFlowchartDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
+  @Matches(/^[^\r\n\t]{1,100}$/, {
+    message: 'name 不能包含换行或制表符',
+  })
   name: string;
 
   /** 子流程图描述（可选） */
@@ -23,6 +31,9 @@ export class CreateSubFlowchartDto {
   /** 负责人用户 ID（可选；不填时默认为当前登录用户） */
   @IsOptional()
   @IsString()
+  @Matches(USER_ID_PATTERN, {
+    message: 'ownerId 格式不合法',
+  })
   ownerId?: string;
 
   /**
@@ -31,6 +42,9 @@ export class CreateSubFlowchartDto {
    */
   @IsString()
   @IsNotEmpty()
+  @Matches(NODE_ID_PATTERN, {
+    message: 'parentNodeId 格式不合法',
+  })
   parentNodeId: string;
 
   /** 截止时间（可选，ISO 8601 格式） */

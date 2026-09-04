@@ -1,70 +1,87 @@
 import { useEffect, useState } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import {
+  Badge,
   Button,
   Dropdown,
   Form,
   Input,
   Layout,
+  List,
   Modal,
+  Popover,
   Space,
   Typography,
   message,
 } from 'antd';
-import { ApartmentOutlined, LogoutOutlined, SafetyOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
+import {
+  ApartmentOutlined,
+  BellOutlined,
+  LogoutOutlined,
+  SafetyOutlined,
+  SearchOutlined,
+  UserOutlined,
+} from '@ant-design/icons';
 import { issueDevToken } from '../../api/auth';
-import TeamManagement from '../TeamManagement';
 import {
   clearTokenSnapshot,
   getTokenSnapshot,
   setTokenSnapshot,
   subscribeTokenChange,
 } from '../../auth/token';
+import { OPEN_WORKSPACE_SEARCH_EVENT } from '../../constants/workspaceEvents';
 
 const { Header, Content } = Layout;
+const { Text } = Typography;
 
-/* 产品 Slogan 轮播列表，每 5 秒切换一条 */
-const SLOGANS = [
-  '用流程约束，让交付可追溯',
-  '每个节点，都是一次承诺',
-  '流程驱动协作，文档守护质量',
-  '从想法到交付，每步有迹可循',
-  '让团队对齐，在每个关键节点',
+/** 顶部通知条目（MVP 使用本地列表，后续可替换为后端通知接口） */
+const NOTIFICATIONS = [
+  { id: 'n-1', unread: true, title: '需求评审节点已通过', desc: '项目A / 主流程图 · 2小时前' },
+  { id: 'n-2', unread: true, title: '技术方案节点被回退', desc: '原因：评审文档不完整 · 5小时前' },
+  { id: 'n-3', unread: false, title: '开发节点等待你开始', desc: '项目B / 功能流程 · 昨天' },
 ];
 
 /**
  * 全局应用布局
- * - 顶部毛玻璃导航栏（品牌渐变条 + 用户头像入口）
+ * - 顶部工具化导航栏（品牌 + 全局搜索 + 通知 + 用户菜单）
  * - 主内容区域铺满 Header 以下
  */
 export default function AppLayout() {
   const [tokenSnapshot, setSnapshot] = useState(getTokenSnapshot);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [teamsOpen, setTeamsOpen] = useState(false);
   const [issuingToken, setIssuingToken] = useState(false);
+  const [commandQuery, setCommandQuery] = useState('');
   const [form] = Form.useForm<{ userId: string }>();
-
-  /* Slogan 轮播状态 */
-  const [sloganIdx, setSloganIdx] = useState(0);
-  const [sloganVisible, setSloganVisible] = useState(true);
-
-  useEffect(() => {
-    // 每 5 秒：先淡出（0.4s）再切换文字再淡入
-    const timer = setInterval(() => {
-      setSloganVisible(false);
-      setTimeout(() => {
-        setSloganIdx((prev) => (prev + 1) % SLOGANS.length);
-        setSloganVisible(true);
-      }, 400);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
+  const commandHint =
+    typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+      ? '⌘K'
+      : 'Ctrl K';
 
   useEffect(() => {
     return subscribeTokenChange(() => {
       setSnapshot(getTokenSnapshot());
     });
   }, []);
+
+  useEffect(() => {
+    function emitWorkspaceSearch(query: string, source: 'header' | 'shortcut') {
+      window.dispatchEvent(
+        new CustomEvent(OPEN_WORKSPACE_SEARCH_EVENT, {
+          detail: { query, source },
+        }),
+      );
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      const isSearchShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
+      if (!isSearchShortcut) return;
+      event.preventDefault();
+      emitWorkspaceSearch(commandQuery, 'shortcut');
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [commandQuery]);
 
   async function handleIssueToken() {
     try {
@@ -84,10 +101,56 @@ export default function AppLayout() {
 
   /* 用户头像首字母 */
   const avatarChar = tokenSnapshot?.userId ? tokenSnapshot.userId.charAt(0).toUpperCase() : '?';
+  const unreadCount = NOTIFICATIONS.filter((item) => item.unread).length;
+
+  function emitWorkspaceSearch(query: string, source: 'header' | 'shortcut' = 'header') {
+    window.dispatchEvent(
+      new CustomEvent(OPEN_WORKSPACE_SEARCH_EVENT, {
+        detail: { query, source },
+      }),
+    );
+  }
+
+  const notificationContent = (
+    <div className="top-notification-popover">
+      <div className="top-notification-popover__header">
+        <div>
+          <Text strong>通知中心</Text>
+          <div className="top-notification-popover__meta">最近与流程推进相关的动态</div>
+        </div>
+        <Button type="link" size="small" style={{ padding: 0 }}>
+          全部标为已读
+        </Button>
+      </div>
+      <List
+        size="small"
+        dataSource={NOTIFICATIONS}
+        renderItem={(item) => (
+          <List.Item style={{ alignItems: 'flex-start', gap: 8 }}>
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                marginTop: 6,
+                borderRadius: '50%',
+                background: item.unread ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                flexShrink: 0,
+              }}
+            />
+            <div>
+              <Text style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>{item.title}</Text>
+              <br />
+              <Text style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{item.desc}</Text>
+            </div>
+          </List.Item>
+        )}
+      />
+    </div>
+  );
 
   return (
     <Layout style={{ background: 'var(--color-bg-base)', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* 顶部导航 —— 毛玻璃效果 */}
+      {/* 顶部导航 —— 工具化工作区导航 */}
       <Header
         className="app-header"
         style={{
@@ -100,84 +163,115 @@ export default function AppLayout() {
           lineHeight: '56px',
         }}
       >
-        {/* 品牌入口 */}
-        <Link to="/" className="app-brand">
-          <ApartmentOutlined className="app-brand__icon" />
-          <span className="app-brand__text">Flowkit</span>
-        </Link>
-
-        {/* 居中 Slogan 轮播 */}
-        <div className="app-header-slogan" style={{ opacity: sloganVisible ? 1 : 0 }}>
-          {SLOGANS[sloganIdx]}
+        <div className="app-header__section app-header__section--brand">
+          <Link to="/" className="app-brand">
+            <span className="app-brand__mark">
+              <ApartmentOutlined className="app-brand__icon" />
+            </span>
+            <span className="app-brand__text-wrap">
+              <span className="app-brand__text">Flowkit</span>
+              <span className="app-brand__subtext">流程图驱动协作</span>
+            </span>
+          </Link>
         </div>
 
-        {/* 团队管理入口 */}
-        <Button
-          icon={<TeamOutlined />}
-          onClick={() => setTeamsOpen(true)}
-          style={{ marginLeft: 'auto', borderRadius: 'var(--radius-xl)', fontWeight: 500 }}
-        >
-          团队管理
-        </Button>
+        {/* 顶部全局搜索（命令面板入口） */}
+        <div className="app-header__section app-header__section--search">
+          <Input
+            value={commandQuery}
+            onChange={(event) => {
+              const nextQuery = event.target.value;
+              setCommandQuery(nextQuery);
+              emitWorkspaceSearch(nextQuery);
+            }}
+            onFocus={() => emitWorkspaceSearch(commandQuery)}
+            onPressEnter={() => emitWorkspaceSearch(commandQuery)}
+            prefix={<SearchOutlined style={{ color: 'var(--color-text-muted)' }} />}
+            suffix={<span className="top-command-search__hint">{commandHint}</span>}
+            placeholder="搜索节点、流程图、项目"
+            size="middle"
+            className="top-command-search"
+          />
+        </div>
 
-        {/* 右侧用户区域 */}
-        <div style={{ marginLeft: 12 }}>
-          {tokenSnapshot ? (
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: 'user',
-                    label: (
-                      <Space>
-                        <SafetyOutlined style={{ color: 'var(--color-success)' }} />
-                        <span>已登录: {tokenSnapshot.userId}</span>
-                      </Space>
-                    ),
-                    disabled: true,
-                  },
-                  { type: 'divider' },
-                  {
-                    key: 'switch',
-                    label: '更换令牌',
-                    onClick: () => setLoginOpen(true),
-                  },
-                  {
-                    key: 'logout',
-                    label: '退出登录',
-                    icon: <LogoutOutlined />,
-                    danger: true,
-                    onClick: () => {
-                      clearTokenSnapshot();
-                      message.info('已清除本地令牌');
-                    },
-                  },
-                ],
-              }}
-              placement="bottomRight"
-              trigger={['click']}
-            >
-              <div className="user-avatar-btn">
-                <div className="user-avatar-circle">{avatarChar}</div>
-                <Typography.Text style={{ fontSize: 13, fontWeight: 500 }}>
-                  {tokenSnapshot.userId}
-                </Typography.Text>
-              </div>
-            </Dropdown>
-          ) : (
-            <Button
-              type="primary"
-              icon={<UserOutlined />}
-              onClick={() => setLoginOpen(true)}
-              style={{
-                borderRadius: 'var(--radius-xl)',
-                fontWeight: 500,
-                boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
-              }}
-            >
-              登录
+        <div className="app-header__section app-header__section--actions">
+          <Popover
+            placement="bottomRight"
+            trigger="click"
+            content={notificationContent}
+            overlayClassName="top-notification-popover-overlay"
+          >
+            <Button type="text" className="top-notification-btn">
+              <Badge count={unreadCount} size="small">
+                <BellOutlined style={{ fontSize: 18 }} />
+              </Badge>
             </Button>
-          )}
+          </Popover>
+
+          {/* 右侧用户区域 */}
+          <div>
+            {tokenSnapshot ? (
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'user',
+                      label: (
+                        <Space>
+                          <SafetyOutlined style={{ color: 'var(--color-success)' }} />
+                          <span>已登录: {tokenSnapshot.userId}</span>
+                        </Space>
+                      ),
+                      disabled: true,
+                    },
+                    { type: 'divider' },
+                    {
+                      key: 'switch',
+                      label: '切换开发令牌',
+                      onClick: () => setLoginOpen(true),
+                    },
+                    {
+                      key: 'logout',
+                      label: '退出登录',
+                      icon: <LogoutOutlined />,
+                      danger: true,
+                      onClick: () => {
+                        clearTokenSnapshot();
+                        message.info('已清除本地令牌');
+                      },
+                    },
+                  ],
+                }}
+                placement="bottomRight"
+                trigger={['click']}
+              >
+                <div className="user-avatar-btn" role="button" tabIndex={0}>
+                  <div className="user-avatar-circle">{avatarChar}</div>
+                  <div className="user-avatar-meta">
+                    <Typography.Text className="user-avatar-name">
+                      {tokenSnapshot.userId}
+                    </Typography.Text>
+                    <Typography.Text className="user-avatar-desc">
+                      开发令牌已就绪
+                    </Typography.Text>
+                  </div>
+                </div>
+              </Dropdown>
+            ) : (
+              <Button
+                type="primary"
+                icon={<UserOutlined />}
+                onClick={() => setLoginOpen(true)}
+                style={{
+                  borderRadius: 'var(--radius-xl)',
+                  fontWeight: 500,
+                  boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
+                }}
+              >
+                开发登录
+              </Button>
+            )}
+          </div>
         </div>
       </Header>
 
@@ -185,9 +279,6 @@ export default function AppLayout() {
       <Content style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
       </Content>
-
-      {/* 团队管理 Drawer */}
-      <TeamManagement open={teamsOpen} onClose={() => setTeamsOpen(false)} />
 
       {/* 登录弹窗 —— 美化 */}
       <Modal

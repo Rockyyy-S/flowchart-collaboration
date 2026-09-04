@@ -1,6 +1,6 @@
 # flowchart-collaboration 后端实现总结
 
-> 版本：v0.2 | 日期：2026-04-15 | 负责角色：后端专家 | 状态：中危整改已补齐，待 QA/安全复核
+> 版本：v0.3 | 日期：2026-05-01 | 负责角色：后端专家 | 状态：生产就绪增强完成（P0/P1）
 
 ---
 
@@ -14,6 +14,15 @@
 - 新增最小内存限流守卫，并仅挂载到高风险/高频写接口：`POST /auth/token`、`POST /projects`、`POST /projects/:projectId/documents`、`POST /executions/:executionId/start`、`POST /executions/:executionId/submit`、`POST /executions/:executionId/artifacts/bind`；超限统一返回 `429 RATE_LIMITED`。
 - 重构 `submit()` 为“先计算与暂存副作用，最后统一提交”的风格；不再先持久化 `GATE_CHECKING` 再执行后续动作，若通知或审计等后续步骤失败，会回滚 execution、后继节点解锁以及内存队列写入，避免半更新。
 - 审计日志补充 `projectId` 顶层索引，便于按项目维度安全查询与追踪。
+
+本轮（2026-05-01）新增生产就绪增强：
+
+- 启动层：`main.ts` 增加 10MB body 限制、全局限流守卫、Swagger 挂载（`/api-docs`）、健康检查（`/api/v1/health`）、启动环境日志与优雅停机（SIGTERM/SIGINT）。
+- 可观测性：新增 `RequestLoggingInterceptor`，统一输出结构化日志（start/success/error）并记录关键路径耗时；日志自动脱敏 token/password/secret。
+- 错误处理：增强 `HttpExceptionFilter`，统一错误详情为 `details.items/path/method/timestamp`，按状态码区分 WARN/ERROR。
+- 鉴权：新增刷新令牌接口 `POST /api/v1/auth/token/refresh`，`AuthService` 区分 access/refresh tokenType，支持过期刷新。
+- 契约：主要 Controller 增加 Swagger 注解（`@ApiOperation/@ApiResponse/@ApiParam/@ApiQuery`），支持前后端自助联调。
+- 质量保障：新增 Jest 单测与 e2e（health）基础设施；新增 `seed:dev` 与 `reset:test` 脚本；补充 `.env.example`。
 
 ---
 
@@ -57,6 +66,9 @@ apps/api/
 
 | 方法   | 路径                                           | 核心行为                                               |
 |--------|------------------------------------------------|--------------------------------------------------------|
+| GET    | /api/v1/health                                 | 健康检查，返回 `{status: ok}`                          |
+| POST   | /api/v1/auth/token                             | 签发 access + refresh token                            |
+| POST   | /api/v1/auth/token/refresh                     | 使用 refresh token 刷新 access token                   |
 | POST   | /api/v1/projects                               | 原子创建：Project + 默认 FlowDefinition(DRAFT) + 成员 |
 | GET    | /api/v1/projects/:projectId/audit-logs         | OWNER 查询项目审计日志；支持 `resourceType/resourceId` 过滤 |
 | GET    | /api/v1/projects/:projectId/flows/current      | 已发布版本优先；无发布则返回草稿                       |
@@ -155,9 +167,9 @@ npm run start:dev
 | 内存存储无持久化 | 重启全部丢失 | MVP 可接受；切换 PostgreSQL 时保持 Service 接口不变 |
 | submit() 仍非真正事务 | 当前通过内存快照回滚避免半更新，但进程崩溃/多实例场景仍无法替代 DB 事务 | 切换 PostgreSQL 时引入事务 + outbox，确保跨进程一致性 |
 | 限流仅为单实例内存实现 | 应用重启后窗口清空，多实例/分布式场景无法共享计数 | 正式版本切换 Redis 等集中式限流存储 |
-| 无 JWT 鉴权 | 使用 x-user-id Header 模拟，存在伪造风险 | 正式版本接入 JWT + RBAC Guard，安全审查时补充 |
+| JWT 仍为开发态会话策略 | 已使用 JWT Bearer + refresh，但尚未引入 httpOnly Cookie + CSRF 组合策略 | 上线前评估并切换到更强会话方案 |
 | NodeExecution 初始 READY | 保存草稿时所有节点直接 READY，绕过 PENDING 前置检查 | MVP 简化；正式版本按 predecessorNodeIds 决定初始状态 |
-| 无 OpenAPI 文档生成 | 前端无法自动同步类型 | 后续引入 @nestjs/swagger 并输出 openapi.json |
+| OpenAPI 类型同步未自动化 | 已提供 `/api-docs`，但尚未纳入前端 CI 自动拉取与生成 SDK | 后续接入 openapi-generator 到 CI 流程 |
 
 ---
 

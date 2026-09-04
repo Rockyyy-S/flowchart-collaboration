@@ -47,15 +47,43 @@ export class HttpExceptionFilter implements ExceptionFilter {
           ? resp.message
           : resp.details || [];
       }
+
+      const logPayload = {
+        event: 'http.exception',
+        requestId,
+        method: request.method,
+        path: request.originalUrl,
+        status,
+        code,
+      };
+      if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+        this.logger.error(JSON.stringify(logPayload));
+      } else {
+        this.logger.warn(JSON.stringify(logPayload));
+      }
     } else if (exception instanceof Error) {
-      this.logger.error(`未捕获错误: ${exception.message}`, exception.stack);
+      this.logger.error(
+        JSON.stringify({
+          event: 'http.unhandled-exception',
+          requestId,
+          method: request.method,
+          path: request.originalUrl,
+          message: exception.message,
+        }),
+        exception.stack,
+      );
     }
 
     response.status(status).json({
       code,
       message: Array.isArray(message) ? '输入参数校验失败' : message,
       requestId,
-      details: Array.isArray(message) ? message : details,
+      details: {
+        items: Array.isArray(message) ? message : details,
+        path: request.originalUrl,
+        method: request.method,
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 

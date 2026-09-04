@@ -1,0 +1,225 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - paragraph [ref=e7]: Flow Collaboration
+        - heading "流程协作工作台" [level=1] [ref=e8]
+        - paragraph [ref=e9]: 把团队、项目和流程节点收拢到一个更清晰的协作视图里。
+      - button "新建团队" [ref=e10] [cursor=pointer]
+    - generic [ref=e11]:
+      - paragraph [ref=e12]: 快速定位
+      - generic [ref=e13]:
+        - generic [ref=e14]: 搜索团队 / 项目
+        - textbox "搜索团队 / 项目" [ref=e15]:
+          - /placeholder: 输入关键词快速过滤
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - heading "我的团队" [level=3] [ref=e19]
+          - paragraph [ref=e20]: 当前协作者参与的团队空间。
+        - generic [ref=e21]: "2"
+      - generic [ref=e22]:
+        - article [ref=e23]:
+          - generic [ref=e24]:
+            - generic [ref=e25]: A
+            - generic [ref=e26]:
+              - strong [ref=e27]: Alpha 产品协作组
+              - paragraph [ref=e28]: 负责企业采购平台从需求到验收的主链路推进。
+          - generic [ref=e29]:
+            - generic [ref=e30]: 5 名成员
+            - generic [ref=e31]:
+              - button "管理成员" [ref=e32] [cursor=pointer]
+              - button "删除" [ref=e33] [cursor=pointer]
+        - article [ref=e34]:
+          - generic [ref=e35]:
+            - generic [ref=e36]: 增
+            - generic [ref=e37]:
+              - strong [ref=e38]: 增长实验室
+              - paragraph [ref=e39]: 承接活动投放、落地页、复盘等快速协作项目。
+          - generic [ref=e41]: 3 名成员
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - heading "可见项目" [level=3] [ref=e45]
+          - paragraph [ref=e46]: 按项目查看流程树和当前协作状态。
+        - button "新建项目" [ref=e47] [cursor=pointer]
+      - article [ref=e48]:
+        - generic [ref=e50]:
+          - generic [ref=e52]: Alpha 产品协作组
+          - strong [ref=e53]: 企业采购平台重构
+          - paragraph [ref=e54]: 重建采购主站的协作流程，重点验证团队绑定、子流程和节点审核回退。
+        - generic [ref=e55]:
+          - generic [ref=e56]:
+            - strong [ref=e57]: "3"
+            - generic [ref=e58]: 流程图
+          - generic [ref=e59]:
+            - strong [ref=e60]: "8"
+            - generic [ref=e61]: 任务
+          - generic [ref=e62]:
+            - strong [ref=e63]: "4"
+            - generic [ref=e64]: 已完成
+        - generic [ref=e66]:
+          - button "主流程 主流程 进行中" [ref=e67] [cursor=pointer]:
+            - generic [ref=e68]:
+              - generic [ref=e69]: 主流程
+              - generic [ref=e70]: 主流程
+            - generic [ref=e71]: 进行中
+          - button "删除" [ref=e72] [cursor=pointer]
+          - generic [ref=e73]:
+            - button "子流程 视觉子流程 已完成" [ref=e74] [cursor=pointer]:
+              - generic [ref=e75]:
+                - generic [ref=e76]: 子流程
+                - generic [ref=e77]: 视觉子流程
+              - generic [ref=e78]: 已完成
+            - button "删除" [ref=e79] [cursor=pointer]
+          - generic [ref=e80]:
+            - button "子流程 交互子流程 已超期" [ref=e81] [cursor=pointer]:
+              - generic [ref=e82]:
+                - generic [ref=e83]: 子流程
+                - generic [ref=e84]: 交互子流程
+              - generic [ref=e85]: 已超期
+            - button "删除" [ref=e86] [cursor=pointer]
+        - generic [ref=e87]:
+          - button "新建流程图" [ref=e88] [cursor=pointer]
+          - button "重新绑定团队" [ref=e89] [cursor=pointer]
+          - button "删除项目" [ref=e90] [cursor=pointer]
+      - article [ref=e91]:
+        - generic [ref=e93]:
+          - generic [ref=e95]: 增长实验室
+          - strong [ref=e96]: 618 增长活动排期
+          - paragraph [ref=e97]: 用于验证团队成员跨团队查看项目和多流程图标签切换。
+        - generic [ref=e98]:
+          - generic [ref=e99]:
+            - strong [ref=e100]: "1"
+            - generic [ref=e101]: 流程图
+          - generic [ref=e102]:
+            - strong [ref=e103]: "2"
+            - generic [ref=e104]: 任务
+          - generic [ref=e105]:
+            - strong [ref=e106]: "1"
+            - generic [ref=e107]: 已完成
+        - button "主流程 活动主流程 进行中" [ref=e110] [cursor=pointer]:
+          - generic [ref=e111]:
+            - generic [ref=e112]: 主流程
+            - generic [ref=e113]: 活动主流程
+          - generic [ref=e114]: 进行中
+  - main [ref=e115]:
+    - generic [ref=e116]:
+      - generic [ref=e117]:
+        - paragraph [ref=e118]: 当前协作者
+        - generic [ref=e119]:
+          - heading "张三" [level=2] [ref=e120]
+          - generic [ref=e121]: 产品负责人
+        - generic [ref=e122]:
+          - generic [ref=e123]: 可见项目 2 个
+          - generic [ref=e124]: 团队 2 个
+          - generic [ref=e125]: 已打开流程 2 个
+      - generic [ref=e127]:
+        - generic [ref=e128]: 切换视角
+        - combobox "切换视角" [ref=e129]:
+          - option "张三 / 产品负责人" [selected]
+          - option "李四 / 交互设计师"
+          - option "王五 / 前端工程师"
+          - option "赵六 / 后端工程师"
+          - option "陈晨 / 测试负责人"
+          - option "林若 / 增长策划"
+    - generic [ref=e130]:
+      - tablist "打开的流程图" [ref=e131]:
+        - tab "企业采购平台重构/主流程" [selected] [ref=e132] [cursor=pointer]:
+          - generic [ref=e133]: 企业采购平台重构/主流程
+        - button "关闭 主流程" [ref=e134] [cursor=pointer]: ×
+        - tab "企业采购平台重构/交互子流程" [ref=e135] [cursor=pointer]:
+          - generic [ref=e136]: 企业采购平台重构/交互子流程
+        - button "关闭 交互子流程" [ref=e137] [cursor=pointer]: ×
+      - generic [ref=e138]:
+        - generic [ref=e139]:
+          - paragraph [ref=e140]: 项目空间
+          - heading "企业采购平台重构" [level=2] [ref=e141]
+          - paragraph [ref=e142]: 重建采购主站的协作流程，重点验证团队绑定、子流程和节点审核回退。
+          - generic [ref=e143]:
+            - generic [ref=e144]: 绑定团队 Alpha 产品协作组
+            - generic [ref=e145]: 当前流程 进行中
+        - generic [ref=e146]:
+          - generic [ref=e147]:
+            - text: 总任务
+            - strong [ref=e148]: "8"
+          - generic [ref=e149]:
+            - text: 进行中
+            - strong [ref=e150]: "2"
+          - generic [ref=e151]:
+            - text: 已完成
+            - strong [ref=e152]: "4"
+          - generic [ref=e153]:
+            - text: 流程节点
+            - strong [ref=e154]: "6"
+      - generic [ref=e155]:
+        - generic [ref=e156]:
+          - generic [ref=e157]:
+            - paragraph [ref=e158]: 当前流程图
+            - heading "主流程" [level=2] [ref=e159]
+            - paragraph [ref=e160]: 采购平台重构项目的主流程图。
+          - generic [ref=e161]:
+            - generic [ref=e162]: 进行中
+            - generic [ref=e163]: 节点 6
+            - generic [ref=e164]: 截止 05/12 18:00
+        - generic [ref=e165]:
+          - button "已完成 开始 项目正式启动。 项目已启动" [ref=e168] [cursor=pointer]:
+            - generic [ref=e170]: 已完成
+            - generic [ref=e171]:
+              - strong [ref=e172]: 开始
+              - paragraph [ref=e173]: 项目正式启动。
+            - generic [ref=e175]: 项目已启动
+          - button "已完成 需求澄清 补齐业务边界、关键指标和范围确认。 参与者 1 产物 2" [ref=e179] [cursor=pointer]:
+            - generic [ref=e181]: 已完成
+            - generic [ref=e182]:
+              - strong [ref=e183]: 需求澄清
+              - paragraph [ref=e184]: 补齐业务边界、关键指标和范围确认。
+            - generic [ref=e185]:
+              - generic [ref=e186]: 参与者 1
+              - generic [ref=e187]: 产物 2
+          - button "已超期 设计协同 主流程中的分支节点，需要视觉和交互两个子流程全部完成后才能继续。 参与者 2 产物 1 子流程图 展开 视觉子流程 已完成 打开 展开 交互子流程 已超期 打开" [ref=e191] [cursor=pointer]:
+            - generic [ref=e192]:
+              - generic [ref=e193]:
+                - generic [ref=e195]: 已超期
+                - generic [ref=e196]:
+                  - strong [ref=e197]: 设计协同
+                  - paragraph [ref=e198]: 主流程中的分支节点，需要视觉和交互两个子流程全部完成后才能继续。
+                - generic [ref=e199]:
+                  - generic [ref=e200]: 参与者 2
+                  - generic [ref=e201]: 产物 1
+              - generic [ref=e202]:
+                - generic [ref=e203]: 子流程图
+                - generic [ref=e204]:
+                  - button "展开" [ref=e205]
+                  - generic [ref=e206]:
+                    - strong [ref=e207]: 视觉子流程
+                    - generic [ref=e208]: 已完成
+                  - button "打开" [ref=e209]
+                - generic [ref=e210]:
+                  - button "展开" [ref=e211]
+                  - generic [ref=e212]:
+                    - strong [ref=e213]: 交互子流程
+                    - generic [ref=e214]: 已超期
+                  - button "打开" [ref=e215]
+          - button "未开始 开发联调 设计验收通过后，前后端共同完成联调。 参与者 2 产物 0" [ref=e219] [cursor=pointer]:
+            - generic [ref=e221]: 未开始
+            - generic [ref=e222]:
+              - strong [ref=e223]: 开发联调
+              - paragraph [ref=e224]: 设计验收通过后，前后端共同完成联调。
+            - generic [ref=e225]:
+              - generic [ref=e226]: 参与者 2
+              - generic [ref=e227]: 产物 0
+          - button "未开始 验收上线 由测试和项目负责人确认产出物符合要求后推进结束。 参与者 2 产物 0" [ref=e231] [cursor=pointer]:
+            - generic [ref=e233]: 未开始
+            - generic [ref=e234]:
+              - strong [ref=e235]: 验收上线
+              - paragraph [ref=e236]: 由测试和项目负责人确认产出物符合要求后推进结束。
+            - generic [ref=e237]:
+              - generic [ref=e238]: 参与者 2
+              - generic [ref=e239]: 产物 0
+          - button "未开始 结束 主流程结束。 等待全部任务结束" [ref=e243] [cursor=pointer]:
+            - generic [ref=e245]: 未开始
+            - generic [ref=e246]:
+              - strong [ref=e247]: 结束
+              - paragraph [ref=e248]: 主流程结束。
+            - generic [ref=e250]: 等待全部任务结束

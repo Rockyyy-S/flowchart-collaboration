@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, Matches, MaxLength } from 'class-validator';
+import { NODE_ID_PATTERN } from '../../common/constants/validation-patterns';
 
 /** 拒绝/回退请求体 */
 export class RejectExecutionDto {
@@ -8,10 +9,14 @@ export class RejectExecutionDto {
    */
   @IsString()
   @IsNotEmpty()
+  @Matches(NODE_ID_PATTERN, {
+    message: 'nextNodeId 格式不合法',
+  })
   nextNodeId: string;
 
   /** 拒绝理由（必填） */
   @IsString()
   @IsNotEmpty()
+  @MaxLength(500)
   reason: string;
 }

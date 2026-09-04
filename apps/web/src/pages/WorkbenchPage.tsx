@@ -23,8 +23,9 @@ import {
 import dayjs from 'dayjs';
 import { createProject } from '../api/projects';
 import { updateFlowDraft } from '../api/flows';
+import { getMyTeams } from '../api/teams';
 import { getAccessToken, subscribeTokenChange } from '../auth/token';
-import type { ProjectSummary } from '../api/types';
+import type { ProjectSummary, UpdateFlowDraftDto } from '../api/types';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -32,7 +33,7 @@ const { Title, Text, Paragraph } = Typography;
 const STORAGE_KEY = 'flowkit_projects';
 
 /** 预设演示项目流程（研发标准交付流程） */
-const DEMO_FLOW = {
+const DEMO_FLOW: UpdateFlowDraftDto = {
   graphJson: {
     nodes: [
       { id: 'node-req', text: '需求评审', type: 'START' },
@@ -121,7 +122,7 @@ export default function WorkbenchPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [demoLoading, setDemoLoading] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  const [form] = Form.useForm<{ name: string }>();
+  const [form] = Form.useForm<{ name: string; description?: string }>();
   const [hasToken, setHasToken] = useState(() => !!getAccessToken());
   const creating = demoLoading || formLoading;
 
@@ -150,7 +151,12 @@ export default function WorkbenchPage() {
 
     setDemoLoading(true);
     try {
-      const project = await createProject('示例研发项目');
+      const teams = await getMyTeams().catch(() => []);
+      if (teams.length === 0) {
+        message.warning('请先创建团队，再通过工作台创建项目');
+        return;
+      }
+      const project = await createProject('示例研发项目', teams[0].id);
       await updateFlowDraft(project.projectId, DEMO_FLOW);
       message.success('演示项目已创建，正在进入工作台…');
       addAndNavigate({
@@ -174,7 +180,12 @@ export default function WorkbenchPage() {
     try {
       const values = await form.validateFields();
       setFormLoading(true);
-      const project = await createProject(values.name.trim());
+      const teams = await getMyTeams().catch(() => []);
+      if (teams.length === 0) {
+        message.warning('请先创建团队，再通过工作台创建项目');
+        return;
+      }
+      const project = await createProject(values.name.trim(), teams[0].id, values.description?.trim());
       // 空白项目也初始化一个单节点示意草稿
       await updateFlowDraft(project.projectId, {
         graphJson: {
@@ -352,6 +363,14 @@ export default function WorkbenchPage() {
               placeholder="例如：Q3 商城改版项目"
               autoFocus
               maxLength={50}
+              showCount
+            />
+          </Form.Item>
+          <Form.Item label="项目描述" name="description">
+            <Input.TextArea
+              placeholder="可选，补充项目目标或背景说明"
+              rows={3}
+              maxLength={200}
               showCount
             />
           </Form.Item>

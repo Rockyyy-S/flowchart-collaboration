@@ -6,8 +6,16 @@ export async function createProject(
   name: string,
   teamId: string,
   description?: string,
+  memberIds?: string[],
 ): Promise<Project> {
-  const res = await apiClient.post<Project>('/projects', { name, teamId, description });
+  const res = await apiClient.post<Project>('/projects', {
+    name,
+    teamId,
+    description,
+    members: memberIds?.length
+      ? memberIds.map((userId) => ({ userId, role: 'MEMBER' as const }))
+      : undefined,
+  });
   return res.data;
 }
 

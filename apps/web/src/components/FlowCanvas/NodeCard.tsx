@@ -1,6 +1,7 @@
 import { Badge, Button, Card, Tag, Tooltip, Typography } from 'antd';
 import {
   CheckCircleOutlined,
+  CloseCircleOutlined,
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   LoadingOutlined,
@@ -60,6 +61,12 @@ const STATUS_CONFIG: Record<
     color: '#ef4444',
     icon: <ExclamationCircleOutlined />,
     bgGradient: 'linear-gradient(135deg, #fef2f2, #fee2e2)',
+  },
+  REJECTED: {
+    label: '被回退',
+    color: '#dc2626',
+    icon: <CloseCircleOutlined />,
+    bgGradient: 'linear-gradient(135deg, #fff1f2, #ffe4e6)',
   },
 };
 

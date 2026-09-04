@@ -15,6 +15,12 @@ import { AuthenticatedRequest } from '../interfaces/authenticated-request.interf
 @Injectable()
 export class MemoryRateLimitGuard implements CanActivate {
   private readonly buckets = new Map<string, number[]>();
+  private readonly defaultOptions: RateLimitOptions = {
+    keyPrefix: 'global-default',
+    limit: Number.parseInt(process.env.GLOBAL_RATE_LIMIT_PER_MINUTE || '120', 10),
+    windowMs: 60_000,
+    identifyBy: 'ip',
+  };
 
   constructor(private readonly reflector: Reflector) {}
 
@@ -24,23 +30,21 @@ export class MemoryRateLimitGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    if (!options) {
-      return true;
-    }
+    const effectiveOptions = options || this.defaultOptions;
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const identifier = this.resolveIdentifier(request, options.identifyBy);
-    const bucketKey = `${options.keyPrefix}:${identifier}`;
+    const identifier = this.resolveIdentifier(request, effectiveOptions.identifyBy);
+    const bucketKey = `${effectiveOptions.keyPrefix}:${identifier}`;
     const now = Date.now();
-    const windowStart = now - options.windowMs;
+    const windowStart = now - effectiveOptions.windowMs;
     const activeHits = (this.buckets.get(bucketKey) || []).filter(
       (timestamp) => timestamp > windowStart,
     );
 
-    if (activeHits.length >= options.limit) {
+    if (activeHits.length >= effectiveOptions.limit) {
       const retryAfterSeconds = Math.max(
         1,
-        Math.ceil((activeHits[0] + options.windowMs - now) / 1000),
+        Math.ceil((activeHits[0] + effectiveOptions.windowMs - now) / 1000),
       );
 
       throw new HttpException(
@@ -55,7 +59,7 @@ export class MemoryRateLimitGuard implements CanActivate {
 
     activeHits.push(now);
     this.buckets.set(bucketKey, activeHits);
-    this.prune(now, options.windowMs);
+    this.prune(now, effectiveOptions.windowMs);
     return true;
   }
 

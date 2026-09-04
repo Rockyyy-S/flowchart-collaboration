@@ -14,14 +14,19 @@ import {
   Max,
   ArrayMaxSize,
   ArrayMinSize,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { NODE_ID_PATTERN, USER_ID_PATTERN } from '../../common/constants/validation-patterns';
 
 export class ArtifactRequirementDto {
   /** 在 flow 范围内稳定唯一，一经创建不允许删除重建 */
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
+  @Matches(NODE_ID_PATTERN, {
+    message: 'ArtifactRequirement.id 格式不合法',
+  })
   id: string;
 
   @IsString()
@@ -41,6 +46,9 @@ export class NodeConfigDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
+  @Matches(NODE_ID_PATTERN, {
+    message: 'nodeId 格式不合法',
+  })
   nodeId: string;
 
   @IsString()
@@ -50,6 +58,7 @@ export class NodeConfigDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['START', 'END', 'TASK_SIMPLE', 'TASK_BRANCH'])
   type?: string;
 
   /** 该节点的输出物要求列表 */
@@ -65,12 +74,20 @@ export class NodeConfigDto {
   @IsArray()
   @ArrayMaxSize(20)
   @IsString({ each: true })
+  @Matches(NODE_ID_PATTERN, {
+    each: true,
+    message: 'predecessorNodeIds 中存在非法节点 ID',
+  })
   predecessorNodeIds?: string[];
 
   /** 执行人列表（用户 ID） */
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  @Matches(USER_ID_PATTERN, {
+    each: true,
+    message: 'assignees 中存在非法用户 ID',
+  })
   @ArrayMaxSize(50)
   assignees?: string[];
 

@@ -46,7 +46,7 @@ import { createFlowchart, getProjectFlowcharts } from '../../api/flowcharts';
 import { getMyTeams } from '../../api/teams';
 import { updateFlowDraft } from '../../api/flows';
 import { getAccessToken } from '../../auth/token';
-import type { Flowchart, ProjectListItem, ProjectSummary } from '../../api/types';
+import type { Flowchart, ProjectListItem, ProjectSummary, UpdateFlowDraftDto } from '../../api/types';
 
 const { Text } = Typography;
 
@@ -54,25 +54,25 @@ const { Text } = Typography;
 const STORAGE_KEY = 'flowkit_projects';
 
 /** 预设演示项目流程 */
-const DEMO_FLOW = {
+const DEMO_FLOW: UpdateFlowDraftDto = {
   graphJson: {
     nodes: [
-      { id: 'node-req', text: '需求评审', type: 'START' as const },
-      { id: 'node-tech', text: '技术方案评审' },
-      { id: 'node-dev', text: '开发' },
-      { id: 'node-qa', text: '测试验收' },
-      { id: 'node-deploy', text: '发布上线', type: 'END' as const },
+      { id: 'node_requirement_review', text: '需求评审', type: 'START' as const },
+      { id: 'node_tech_review', text: '技术方案评审' },
+      { id: 'node_dev', text: '开发' },
+      { id: 'node_qa', text: '测试验收' },
+      { id: 'node_deploy', text: '发布上线', type: 'END' as const },
     ],
     edges: [
-      { source: 'node-req', target: 'node-tech' },
-      { source: 'node-tech', target: 'node-dev' },
-      { source: 'node-dev', target: 'node-qa' },
-      { source: 'node-qa', target: 'node-deploy' },
+      { source: 'node_requirement_review', target: 'node_tech_review' },
+      { source: 'node_tech_review', target: 'node_dev' },
+      { source: 'node_dev', target: 'node_qa' },
+      { source: 'node_qa', target: 'node_deploy' },
     ],
   },
   nodesConfig: [
     {
-      nodeId: 'node-req',
+      nodeId: 'node_requirement_review',
       name: '需求评审',
       type: 'START',
       requiredArtifacts: [
@@ -81,37 +81,37 @@ const DEMO_FLOW = {
       predecessorNodeIds: [],
     },
     {
-      nodeId: 'node-tech',
+      nodeId: 'node_tech_review',
       name: '技术方案评审',
       requiredArtifacts: [
         { id: 'art-tech-doc', name: '技术方案文档', required: true },
       ],
-      predecessorNodeIds: ['node-req'],
+      predecessorNodeIds: ['node_requirement_review'],
     },
     {
-      nodeId: 'node-dev',
+      nodeId: 'node_dev',
       name: '开发',
       requiredArtifacts: [
         { id: 'art-code-review', name: '代码评审报告', required: true },
       ],
-      predecessorNodeIds: ['node-tech'],
+      predecessorNodeIds: ['node_tech_review'],
     },
     {
-      nodeId: 'node-qa',
+      nodeId: 'node_qa',
       name: '测试验收',
       requiredArtifacts: [
         { id: 'art-test-report', name: '测试报告', required: true },
       ],
-      predecessorNodeIds: ['node-dev'],
+      predecessorNodeIds: ['node_dev'],
     },
     {
-      nodeId: 'node-deploy',
+      nodeId: 'node_deploy',
       name: '发布上线',
       type: 'END',
       requiredArtifacts: [
         { id: 'art-release-checklist', name: '发布清单', required: false },
       ],
-      predecessorNodeIds: ['node-qa'],
+      predecessorNodeIds: ['node_qa'],
     },
   ],
 };
@@ -167,6 +167,8 @@ const FLOWCHART_STATUS_MAP = {
 /** 创建项目表单字段 */
 interface CreateProjectFormValues {
   name: string;
+  description?: string;
+  memberIds?: string[];
   teamId: string;
   createFlowchart: boolean;
   flowchartName?: string;
@@ -212,6 +214,7 @@ export default function ProjectListPanel({
   const [createFlowchartEnabled, setCreateFlowchartEnabled] = useState(true);
   const [creating, setCreating] = useState(false);
   const [form] = Form.useForm<CreateProjectFormValues>();
+  const selectedTeamId = Form.useWatch('teamId', form);
 
   /* 从后端获取项目列表 */
   const { data: remoteProjects = [], isLoading } = useQuery({
@@ -228,6 +231,15 @@ export default function ProjectListPanel({
     enabled: hasToken && createModalOpen,
     staleTime: 15000,
   });
+
+  /* 成员选项与团队选择联动：仅展示所选团队成员，避免“下拉可选但提交无效”的体验 */
+  const availableMemberIds = useMemo(() => {
+    if (!selectedTeamId) {
+      return [];
+    }
+    const team = myTeams.find((item) => item.id === selectedTeamId);
+    return (team?.memberIds ?? []).slice().sort();
+  }, [myTeams, selectedTeamId]);
 
   /* 展开项目时拉取其流程图列表 */
   const { data: projectFlowcharts, isLoading: flowchartsLoading } = useQuery({
@@ -252,6 +264,8 @@ export default function ProjectListPanel({
     const participatedList = remoteProjects.filter((p) => p.role !== 'OWNER');
     return { owned: classifyByProgress(ownedList), participated: classifyByProgress(participatedList) };
   }, [remoteProjects]);
+  const totalProjectCount = remoteProjects.length;
+  const activeProjectCount = owned.inProgress.length + participated.inProgress.length;
 
   /** 切换展开/收起某个项目的流程图列表 */
   function toggleExpandProject(projectId: string) {
@@ -297,15 +311,22 @@ export default function ProjectListPanel({
     if (creating) return;
     try {
       const values = await form.validateFields();
+      /* memberIds 现在直接是选中的数组，无需再做 trim/filter */
+      const memberIds = values.memberIds?.length ? values.memberIds : undefined;
       setCreating(true);
-      const project = await createProject(values.name.trim(), values.teamId);
+      const project = await createProject(
+        values.name.trim(),
+        values.teamId,
+        values.description?.trim(),
+        memberIds,
+      );
       await updateFlowDraft(project.projectId, {
         graphJson: {
-          nodes: [{ id: 'node-start', text: '起始节点', type: 'START' as const }],
+          nodes: [{ id: 'node_start', text: '起始节点', type: 'START' as const }],
           edges: [],
         },
         nodesConfig: [{
-          nodeId: 'node-start', name: '起始节点', type: 'START' as const,
+          nodeId: 'node_start', name: '起始节点', type: 'START' as const,
           requiredArtifacts: [], predecessorNodeIds: [],
         }],
       });
@@ -518,31 +539,76 @@ export default function ProjectListPanel({
     <div className="project-list-panel">
       {/* 顶部操作区 */}
       <div className="project-list-panel__header">
-        <Button
-          type="primary" icon={<PlusOutlined />} disabled={creating}
-          onClick={() => setCreateModalOpen(true)}
-          style={{ borderRadius: 'var(--radius-sm)', fontWeight: 500, flex: 1 }}
-        >
-          新建
-        </Button>
-        <Button icon={<RocketOutlined />} loading={creating} onClick={handleCreateDemo}
-          style={{ borderRadius: 'var(--radius-sm)', flex: 1 }}>
-          快速体验
-        </Button>
-        <Button type="text" size="small" className="project-list-panel__collapse-btn"
-          icon={<DoubleLeftOutlined />} onClick={onToggleCollapse} />
+        <div className="project-list-panel__heading">
+          <div>
+            <div className="project-list-panel__title">项目空间</div>
+            <div className="project-list-panel__subtitle">
+              {totalProjectCount > 0 ? `共 ${totalProjectCount} 个项目，${activeProjectCount} 个推进中` : '先建团队，再把流程图和项目放进来'}
+            </div>
+          </div>
+          <Button type="text" size="small" className="project-list-panel__collapse-btn"
+            icon={<DoubleLeftOutlined />} onClick={onToggleCollapse} />
+        </div>
+        <div className="project-list-panel__actions">
+          <Button
+            type="primary" icon={<PlusOutlined />} disabled={creating}
+            onClick={() => setCreateModalOpen(true)}
+            style={{ borderRadius: 'var(--radius-sm)', fontWeight: 500, flex: 1 }}
+          >
+            新建项目
+          </Button>
+          <Button icon={<RocketOutlined />} loading={creating} onClick={handleCreateDemo}
+            style={{ borderRadius: 'var(--radius-sm)', flex: 1 }}>
+            演示项目
+          </Button>
+        </div>
       </div>
 
       {/* 项目列表内容 */}
       <div className="project-list-panel__body">
         {isLoading ? (
           <div style={{ textAlign: 'center', padding: 24 }}><Spin size="small" /></div>
+        ) : !hasToken ? (
+          <div className="project-list-empty">
+            <div className="project-list-empty__icon">
+              <TeamOutlined />
+            </div>
+            <div className="project-list-empty__text">
+              先在右上角获取开发令牌，再创建团队和项目。
+            </div>
+          </div>
+        ) : totalProjectCount === 0 ? (
+          <div className="project-list-empty">
+            <div className="project-list-empty__icon">
+              <FolderOutlined />
+            </div>
+            <div className="project-list-empty__text">
+              还没有项目。建议先创建一个团队，然后从演示项目或空白项目开始。
+            </div>
+            <Space style={{ marginTop: 12 }}>
+              <Button type="primary" size="small" onClick={() => setCreateModalOpen(true)}>
+                新建项目
+              </Button>
+              <Button size="small" onClick={handleCreateDemo}>
+                载入演示
+              </Button>
+            </Space>
+          </div>
         ) : (
           <>
             {renderCategory('我负责的项目', owned, 'owned')}
             {renderCategory('我参与的项目', participated, 'participated')}
           </>
         )}
+      </div>
+
+      <div className="project-list-panel__footer">
+        <div className="project-list-panel__summary-card">
+          <Text style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>快速提示</Text>
+          <Text style={{ fontSize: 12 }}>
+            打开流程图后会在中间工作区以标签形式展开，方便并行查看多个流程。
+          </Text>
+        </div>
       </div>
 
       {/* 新建项目弹窗 */}
@@ -574,6 +640,33 @@ export default function ProjectListPanel({
             <Input placeholder="例如：Q2 产品迭代" autoFocus maxLength={50} />
           </Form.Item>
 
+          <Form.Item label="项目描述" name="description">
+            <Input.TextArea
+              placeholder="可选，简要说明项目目标或范围"
+              rows={3}
+              maxLength={200}
+              showCount
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="初始成员 ID"
+            name="memberIds"
+            extra="创建者会自动加入项目，无需重复填写；成员列表随所选团队联动。"
+          >
+            <Select
+              mode="multiple"
+              placeholder={selectedTeamId ? '请选择初始成员' : '请先选择绑定团队'}
+              disabled={!selectedTeamId}
+              options={availableMemberIds.map((id) => ({ value: id, label: id }))}
+              notFoundContent={
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {selectedTeamId ? '当前团队暂无成员，请先在团队管理中添加成员' : '请先选择绑定团队'}
+                </Text>
+              }
+            />
+          </Form.Item>
+
           {/* 绑定团队（必填） */}
           <Form.Item
             label="绑定团队" name="teamId"
@@ -582,6 +675,10 @@ export default function ProjectListPanel({
           >
             <Select
               placeholder="请选择团队"
+              onChange={() => {
+                // 切换团队时清空已选成员，避免保留跨团队成员导致后续提交异常。
+                form.setFieldValue('memberIds', []);
+              }}
               options={myTeams.map((t) => ({ value: t.id, label: `${t.name}（${t.memberIds.length} 人）` }))}
               notFoundContent={<Text type="secondary" style={{ fontSize: 12 }}>暂无团队，请先在「团队管理」中创建</Text>}
             />

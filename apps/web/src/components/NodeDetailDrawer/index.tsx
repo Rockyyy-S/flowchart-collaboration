@@ -54,6 +54,7 @@ const STATUS_TAG: Record<ExecutionStatus, { color: string; label: string }> = {
   GATE_CHECKING: { color: 'purple', label: '门禁检查中' },
   COMPLETED: { color: 'success', label: '已完成' },
   NEEDS_FIX: { color: 'error', label: '待补齐' },
+  REJECTED: { color: 'red', label: '被回退' },
 };
 
 interface NodeDetailDrawerProps {

@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, Matches } from 'class-validator';
+import { NODE_ID_PATTERN } from '../../common/constants/validation-patterns';
 
 /** 审核通过请求体 */
 export class ApproveExecutionDto {
@@ -8,5 +9,8 @@ export class ApproveExecutionDto {
    */
   @IsString()
   @IsNotEmpty()
+  @Matches(NODE_ID_PATTERN, {
+    message: 'nextNodeId 格式不合法',
+  })
   nextNodeId: string;
 }
